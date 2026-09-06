@@ -624,4 +624,7 @@ def render_brewers_dashboard(game_pk):
         with col_log:
             st.markdown(f"<div style='height: 24px; display: flex; align-items: center;'><b>Batted Balls ({inning_state[:3]} {inning_num})</b></div>", unsafe_allow_html=True)
             batted_headers = ['Batter', 'Result', 'EV (mph)', 'LA (°)', 'Dist (ft)']
-            batted_html = render_custom_table(batted_headers, half_inning_batted_balls,
+            batted_html = render_custom_table(batted_headers, half_inning_batted_balls, n_slots=15, omit_last_number=False)
+            st.html(batted_html)
+
+render_brewers_dashboard(game_pk)
