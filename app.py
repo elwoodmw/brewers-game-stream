@@ -164,7 +164,7 @@ st.markdown(f"""
         font-family: 'Fira Code', monospace;
         font-size: 0.78rem;
         white-space: nowrap;
-    }]
+    }}
 
     .custom-table th, .custom-table td {{
         padding: 0 10px;
