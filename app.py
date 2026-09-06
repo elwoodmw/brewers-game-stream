@@ -82,11 +82,12 @@ st.markdown(f"""
         background-color: {card_bg};
         border: 1px solid {card_border};
         border-radius: 8px;
-        padding: 10px 16px;
-        min-height: 85px;
+        padding: 20px 18px;
+        min-height: 125px;
         display: flex;
         flex-direction: column;
         justify-content: center;
+        gap: 6px;
         margin-bottom: 10px;
     }}
 
@@ -413,9 +414,9 @@ def render_brewers_dashboard(game_pk):
             about = p.get('about', {})
             wp = about.get('homeWinProbability')
             if wp is not None:
-                win_probs.append({'play_idx': idx + 1, 'home_wp': wp})
+                win_probs.append({'play_idx': idx + 1, 'home_wp': wp * 100.0 if wp <= 1.0 else wp})
 
-        # 1. Pitch-By-Pitch for Current At-Bat (dynamic rows matching all pitches in current AB)
+        # 1. Pitch-By-Pitch for Current At-Bat
         if current_play:
             p_events = current_play.get('playEvents', [])
             pitch_events_list = [e for e in p_events if e.get('isPitch')]
@@ -549,6 +550,7 @@ def render_brewers_dashboard(game_pk):
             ax_wp.axhline(50, color=card_border, linestyle='--', linewidth=1)
 
             ax_wp.set_ylim(0, 100)
+            ax_wp.set_xlim(1, max(df_wp['play_idx'].max(), 5))
             ax_wp.set_xlabel("Play Index", fontsize=6, color=subtext_color, fontfamily='Fira Code')
             ax_wp.set_ylabel(f"{home_name[:3].upper()} Win %", fontsize=7, color=subtext_color, fontfamily='Fira Code')
             ax_wp.tick_params(colors=subtext_color, labelsize=6)
@@ -582,8 +584,8 @@ def render_brewers_dashboard(game_pk):
                     hide_index=True, 
                     height=500,
                     column_config={
-                        "#": st.column_config.NumberColumn("#", width=40),
-                        "Pitch": st.column_config.TextColumn("Pitch", width=50),
+                        "#": st.column_config.NumberColumn("#", width=35),
+                        "Pitch": st.column_config.TextColumn("Pitch", width=45),
                         "Velo": st.column_config.TextColumn("Velo", width="small"),
                         "Spin": st.column_config.TextColumn("Spin", width="small"),
                         "Result": st.column_config.TextColumn("Result", width="medium")
