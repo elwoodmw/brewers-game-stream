@@ -11,32 +11,16 @@ import statsapi
 # 1. Page Configuration
 st.set_page_config(page_title="Milwaukee Brewers Live Companion", layout="wide")
 
-# Initialize Session State for Theme and Font Selection
+# Initialize Session State for Theme Toggle
 if 'is_dark' not in st.session_state:
     st.session_state.is_dark = True
-
-if 'selected_font' not in st.session_state:
-    st.session_state.selected_font = "Inter"
 
 # Callback for Dark Mode Toggle
 def toggle_dark_mode():
     st.session_state.is_dark = st.session_state.dark_mode_toggle
 
-# Callback for Font Selector
-def update_font():
-    st.session_state.selected_font = st.session_state.font_choice
-
-# Top Header Layout with Font Selector & Theme Toggle
-col_header, col_font, col_toggle = st.columns([3, 1.5, 1])
-
-with col_font:
-    st.selectbox(
-        "Font Style",
-        options=["Inter", "Roboto", "Space Grotesk", "Montserrat", "Fira Code"],
-        index=["Inter", "Roboto", "Space Grotesk", "Montserrat", "Fira Code"].index(st.session_state.selected_font),
-        key="font_choice",
-        on_change=update_font
-    )
+# Top Header Layout with Top-Right Theme Toggle
+col_header, col_toggle = st.columns([5, 1])
 
 with col_toggle:
     st.toggle(
@@ -47,9 +31,8 @@ with col_toggle:
     )
 
 is_dark = st.session_state.is_dark
-current_font = st.session_state.selected_font
 
-# CSS Variables Based on Selected Theme and Font
+# CSS Variables Based on Selected Theme
 bg_color = "#121212" if is_dark else "#F8FAFC"
 card_bg = "#1E293B" if is_dark else "#FFFFFF"
 card_border = "#334155" if is_dark else "#E2E8F0"
@@ -60,15 +43,15 @@ ticker_bg = "#0F172A" if is_dark else "#F1F5F9"
 
 st.markdown(f"""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Inter:wght@400;600;800;900&family=Montserrat:wght@400;600;800;900&family=Roboto:wght@400;500;700;900&family=Space+Grotesk:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap');
     
     html, body, [data-testid="stAppViewContainer"] {{
         background-color: {bg_color} !important;
-        font-family: '{current_font}', sans-serif !important;
+        font-family: 'Fira Code', monospace !important;
     }}
     
     h1, h2, h3, h4, p, span, label, div {{
-        font-family: '{current_font}', sans-serif !important;
+        font-family: 'Fira Code', monospace !important;
         color: {text_color} !important;
     }}
     
@@ -76,14 +59,24 @@ st.markdown(f"""
         padding: 0.2rem 0rem;
         margin-top: -1.0rem !important;
         margin-bottom: 0.5rem;
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
     }}
     
     .main-title {{
-        font-size: 1.8rem !important;
-        font-weight: 900 !important;
-        letter-spacing: -0.05em !important;
+        font-size: 1.6rem !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.03em !important;
         color: {text_color} !important;
         margin-bottom: 0px !important;
+    }}
+
+    .disclaimer-text {{
+        font-size: 0.75rem !important;
+        color: {subtext_color} !important;
+        font-weight: 400 !important;
     }}
     
     .scorebug-container {{
@@ -112,7 +105,7 @@ st.markdown(f"""
 
     .ticker-header {{
         font-size: 0.7rem;
-        font-weight: 800;
+        font-weight: 700;
         color: #00B4D8;
         letter-spacing: 0.05em;
         margin-bottom: 4px;
@@ -135,13 +128,13 @@ st.markdown(f"""
 
     .ticker-teams {{
         font-size: 0.8rem;
-        font-weight: 800;
+        font-weight: 700;
         color: {text_color};
     }}
 
     .ticker-status {{
         font-size: 0.65rem;
-        font-weight: 600;
+        font-weight: 500;
         color: {subtext_color};
         margin-top: 1px;
     }}
@@ -157,6 +150,7 @@ with col_header:
     st.html(f"""
         <div class="title-banner">
             <h1 class="main-title">Milwaukee Brewers Live Statcast Companion</h1>
+            <span class="disclaimer-text">Data belongs to Major League Baseball and is managed through pybaseball</span>
         </div>
     """)
 
@@ -304,7 +298,7 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
     ax.set_xlim(-250, 250)
     ax.set_ylim(-20, 420)
     ax.axis('off')
-    ax.set_title(field_title_label, fontsize=10, fontweight='bold', color=subtext_color, pad=12)
+    ax.set_title(field_title_label, fontsize=10, fontweight='bold', color=subtext_color, pad=12, fontfamily='Fira Code')
     return fig
 
 # 4. Main Application
@@ -447,11 +441,11 @@ def render_brewers_dashboard(game_pk):
         st.html(f'''
             <div class="scorebug-container">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 1.25rem; font-weight: 900;">
+                    <div style="font-size: 1.25rem; font-weight: 700;">
                         {away_name.upper()} <span style="color:{accent_yellow};">{away_runs}</span> &nbsp;@&nbsp; 
                         {home_name.upper()} <span style="color:{accent_yellow};">{home_runs}</span>
                     </div>
-                    <div style="font-size: 0.95rem; font-weight: 600; color: {subtext_color};">
+                    <div style="font-size: 0.95rem; font-weight: 500; color: {subtext_color};">
                         {inning_state} {inning_num} | {outs} Outs
                     </div>
                 </div>
@@ -484,7 +478,7 @@ def render_brewers_dashboard(game_pk):
             ax_wp.axhline(50, color=card_border, linestyle='--', linewidth=1)
 
             ax_wp.set_ylim(0, 100)
-            ax_wp.set_ylabel(f"{home_name[:3].upper()} Win %", fontsize=7, color=subtext_color)
+            ax_wp.set_ylabel(f"{home_name[:3].upper()} Win %", fontsize=7, color=subtext_color, fontfamily='Fira Code')
             ax_wp.tick_params(colors=subtext_color, labelsize=6)
             
             for spine in ax_wp.spines.values():
@@ -531,13 +525,14 @@ def render_brewers_dashboard(game_pk):
                 ax.axvline(0, color=card_border, linewidth=1.2)
                 ax.set_xlim(25, -25)
                 ax.set_ylim(-25, 25)
-                ax.set_xlabel("← Glove | Arm →", fontsize=7, color=subtext_color)
-                ax.set_ylabel("IVB (in)", fontsize=7, color=subtext_color)
+                ax.set_xlabel("← Glove | Arm →", fontsize=7, color=subtext_color, fontfamily='Fira Code')
+                ax.set_ylabel("IVB (in)", fontsize=7, color=subtext_color, fontfamily='Fira Code')
 
                 legend = ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False, fontsize=6)
                 if legend:
                     for t in legend.get_texts():
                         t.set_color(text_color)
+                        t.set_fontfamily('Fira Code')
 
                 st.pyplot(fig, use_container_width=True)
                 plt.close(fig)
