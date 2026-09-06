@@ -11,11 +11,20 @@ import statsapi
 # 1. Page Configuration
 st.set_page_config(page_title="Milwaukee Brewers Live Companion", layout="wide")
 
-# Theme Selection
-theme = st.sidebar.radio("Theme Mode", ["Dark", "Light"], index=0, horizontal=True)
-is_dark = theme == "Dark"
+# Theme Selection State
+if 'is_dark' not in st.session_state:
+    st.session_state.is_dark = True
 
-# CSS Variables Based on Theme
+# Top Header Layout with Top-Right Theme Toggle
+col_header, col_toggle = st.columns([5, 1])
+
+with col_toggle:
+    dark_mode = st.toggle("Dark Mode", value=st.session_state.is_dark)
+    st.session_state.is_dark = dark_mode
+
+is_dark = st.session_state.is_dark
+
+# CSS Variables Based on Selected Theme
 bg_color = "#121212" if is_dark else "#F8FAFC"
 card_bg = "#1E293B" if is_dark else "#FFFFFF"
 card_border = "#334155" if is_dark else "#E2E8F0"
@@ -40,12 +49,8 @@ st.markdown(f"""
     
     .title-banner {{
         padding: 0.2rem 0rem;
-        border-bottom: 1px solid {card_border};
         margin-top: -1.0rem !important;
-        margin-bottom: 1.0rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        margin-bottom: 0.5rem;
     }}
     
     .main-title {{
@@ -114,20 +119,19 @@ st.markdown(f"""
         margin-top: 1px;
     }}
     
-    [data-testid="stSidebar"] {{
-        background-color: {card_bg} !important;
-    }}
+    [data-testid="stSidebar"] {{display: none;}}
     [data-testid="stHeader"] {{visibility: hidden;}}
     footer {{visibility: hidden;}}
     .block-container {{padding-top: 1rem !important;}}
     </style>
 """, unsafe_allow_html=True)
 
-st.html(f"""
-    <div class="title-banner">
-        <h1 class="main-title">Milwaukee Brewers Live Statcast Companion</h1>
-    </div>
-""")
+with col_header:
+    st.html(f"""
+        <div class="title-banner">
+            <h1 class="main-title">Milwaukee Brewers Live Statcast Companion</h1>
+        </div>
+    """)
 
 BREWERS_TEAM_ID = 158
 
@@ -327,26 +331,16 @@ def render_brewers_dashboard(game_pk):
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
 
-    # Calculate Current Pitch Count Telemetry
-    pitch_count_str = "0 | 0S - 0B"
+    # Calculate Total Pitch Count Only for Current Pitcher
+    pitch_count = 0
     if plays:
-        current_play = plays[-1]
         pitcher_id = defense.get('pitcher', {}).get('id')
-        
-        pitches, strikes, balls = 0, 0, 0
         for p in plays:
-            p_events = p.get('playEvents', [])
-            for e in p_events:
-                if e.get('isPitch'):
-                    # Match current pitcher
-                    if p.get('matchup', {}).get('pitcher', {}).get('id') == pitcher_id:
-                        pitches += 1
-                        details = e.get('details', {})
-                        if details.get('isStrike') or details.get('isOut') or details.get('hasReview'):
-                            strikes += 1
-                        else:
-                            balls += 1
-        pitch_count_str = f"{pitches} | {strikes}S - {balls}B"
+            if p.get('matchup', {}).get('pitcher', {}).get('id') == pitcher_id:
+                p_events = p.get('playEvents', [])
+                for e in p_events:
+                    if e.get('isPitch'):
+                        pitch_count += 1
 
     # Out-of-town scores setup
     oot_games = get_league_scoreboard()
@@ -378,7 +372,7 @@ def render_brewers_dashboard(game_pk):
     else:
         ticker_cards_html = f'<div style="color: {subtext_color}; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
 
-    # Scorebug Header Section with Pitch Count
+    # Scorebug Header Section with Clean Pitch Count
     col_scorebug, col_ticker = st.columns([1, 1])
 
     with col_scorebug:
@@ -394,7 +388,7 @@ def render_brewers_dashboard(game_pk):
                     </div>
                 </div>
                 <div style="margin-top: 4px; font-size: 0.8rem; color: {text_color};">
-                    <strong>P:</strong> {pitcher_name} <span style="color:{accent_yellow};">({pitch_count_str})</span> &nbsp;|&nbsp; <strong>AB:</strong> {batter_name}
+                    <strong>P:</strong> {pitcher_name} <span style="color:{accent_yellow};">({pitch_count})</span> &nbsp;|&nbsp; <strong>AB:</strong> {batter_name}
                 </div>
             </div>
         ''')
