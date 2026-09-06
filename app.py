@@ -8,7 +8,7 @@ import seaborn as sns
 import streamlit as st
 import statsapi
 
-# 1. Page Configuration & Inter Font Dark Styling
+# 1. Page Configuration & Dark Theme Styling
 st.set_page_config(page_title="Milwaukee Brewers Live Companion", layout="wide")
 
 st.markdown("""
@@ -55,7 +55,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Minimalist Title Banner
 st.markdown("""
     <div class="title-banner">
         <h1 class="main-title">Milwaukee Brewers Live Statcast Companion</h1>
@@ -64,19 +63,32 @@ st.markdown("""
 
 BREWERS_TEAM_ID = 158
 
+# Standard venue outfield dimensions lookup (LF, LCF, CF, RCF, RF)
+STADIUM_DIMENSIONS = {
+    'Great American Ball Park': {'lf': 328, 'lcf': 379, 'cf': 404, 'rcf': 370, 'rf': 325},
+    'American Family Field': {'lf': 344, 'lcf': 371, 'cf': 400, 'rcf': 374, 'rf': 345},
+}
+
+# Default Fallback Dimensions
+DEFAULT_DIMS = {'lf': 330, 'lcf': 375, 'cf': 400, 'rcf': 375, 'rf': 330}
+
 # 2. Data Fetching Utilities
 @st.cache_data(ttl=60)
 def get_today_brewers_game():
-    """Fetch today's Brewers game_pk using MLB Stats API."""
+    """Fetch today's Brewers game and retrieve home team venue metadata."""
     today_str = datetime.date.today().strftime('%Y-%m-%d')
     try:
         schedule = statsapi.schedule(date=today_str, team=BREWERS_TEAM_ID)
         if schedule:
             game = schedule[0]
-            return game['game_id'], f"{game['away_name']} @ {game['home_name']} ({game['status']})"
+            return (
+                game['game_id'], 
+                f"{game['away_name']} @ {game['home_name']} ({game['status']})",
+                game.get('venue_name', 'Unknown Venue')
+            )
     except Exception:
         pass
-    return None, "No Milwaukee Brewers game scheduled today."
+    return None, "No Milwaukee Brewers game scheduled today.", "Unknown Venue"
 
 def fetch_live_game_feed(game_pk):
     """Fetch raw live feed JSON from MLB API."""
@@ -87,84 +99,105 @@ def fetch_live_game_feed(game_pk):
     return None
 
 def convert_hc_to_field_feet(hc_x, hc_y):
-    """
-    Transforms Gameday hit coordinates (hc_x, hc_y) to feet relative to Home Plate (0,0).
-    Home plate is roughly at (126, 204) in coordinate space.
-    """
+    """Transforms Gameday hit coordinates to feet relative to Home Plate (0,0)."""
     if hc_x is None or hc_y is None:
         return None, None
     x_feet = (hc_x - 126) * 2.29
     y_feet = (204 - hc_y) * 2.29
     return x_feet, y_feet
 
-# 3. Full Ballpark Diagram Generator (American Family Field dimensions)
-def draw_full_baseball_field(batted_balls, runners):
-    """Draws a full dark-theme ballpark (Infield + Outfield Wall + Base Runners + Ball Landing Locations)."""
-    fig, ax = plt.subplots(figsize=(5, 5))
+# 3. Dynamic Field & Diamond Rendering
+def draw_full_baseball_field(batted_balls, runners, venue_name):
+    """Draws a full ballpark with custom home venue dimensions and enhanced diamond detail."""
+    fig, ax = plt.subplots(figsize=(6, 6))
     fig.patch.set_facecolor('#121212')
     ax.set_facecolor('#121212')
 
-    # Outfield Wall Arc (Scaled to ~400ft center field wall like American Family Field)
-    foul_len = 345
-    center_len = 400
+    dims = STADIUM_DIMENSIONS.get(venue_name, DEFAULT_DIMS)
+
+    # Calculate Outfield Wall Arc based on Venue Specs
+    # Angles: -45 deg (LF) to +45 deg (RF)
+    num_points = 50
+    angles = [(-math.pi/4) + (i * (math.pi/2) / (num_points - 1)) for i in range(num_points)]
     
+    wall_x = []
+    wall_y = []
+    for a in angles:
+        # Interpolate distance based on angle
+        if a < 0: # Left Field
+            t = (a + math.pi/4) / (math.pi/4)
+            dist = dims['lf'] * (1 - t) + dims['cf'] * t
+        else: # Right Field
+            t = a / (math.pi/4)
+            dist = dims['cf'] * (1 - t) + dims['rf'] * t
+            
+        wall_x.append(dist * math.sin(a))
+        wall_y.append(dist * math.cos(a))
+
     # Draw Foul Lines
-    ax.plot([0, -foul_len * math.sin(math.pi/4)], [0, foul_len * math.cos(math.pi/4)], color='#64748B', linewidth=1.5)
-    ax.plot([0, foul_len * math.sin(math.pi/4)], [0, foul_len * math.cos(math.pi/4)], color='#64748B', linewidth=1.5)
+    ax.plot([0, wall_x[0]], [0, wall_y[0]], color='#64748B', linewidth=1.5)
+    ax.plot([0, wall_x[-1]], [0, wall_y[-1]], color='#64748B', linewidth=1.5)
 
     # Draw Outfield Wall
-    wall_angles = [i * (math.pi / 2 / 100) - math.pi / 4 for i in range(101)]
-    wall_x = [center_len * math.sin(a) for a in wall_angles]
-    wall_y = [center_len * math.cos(a) for a in wall_angles]
-    ax.plot(wall_x, wall_y, color='#1E293B', linewidth=3)
-    ax.plot(wall_x, wall_y, color='#00B4D8', linewidth=1.2, linestyle='--')
+    ax.plot(wall_x, wall_y, color='#1E293B', linewidth=4)
+    ax.plot(wall_x, wall_y, color='#00B4D8', linewidth=1.5, linestyle='--')
 
-    # Draw Infield Diamond
+    # Enhanced Infield Cutout & Diamond Detail
+    # Infield dirt cutout arc
+    dirt_arc = patches.Arc((0, 60.5), 190, 190, angle=0, theta1=20, theta2=160, color='#1E293B', linewidth=1.5)
+    ax.add_patch(dirt_arc)
+
+    # Infield Baselines
     infield_x = [0, 63.6, 0, -63.6, 0]
     infield_y = [0, 63.6, 127.3, 63.6, 0]
-    ax.plot(infield_x, infield_y, color='#334155', linewidth=1.5)
+    ax.plot(infield_x, infield_y, color='#475569', linewidth=1.8, linestyle='-')
+
+    # Pitcher's Mound & Rubber
+    mound = patches.Circle((0, 60.5), radius=9, facecolor='#1E293B', edgecolor='#475569', linewidth=1)
+    rubber = patches.Rectangle((-1.5, 60), 3, 1, facecolor='#FFFFFF', edgecolor='#FFFFFF')
+    ax.add_patch(mound)
+    ax.add_patch(rubber)
 
     # Bases setup
     bases_coords = {'1b': (63.6, 63.6), '2b': (0, 127.3), '3b': (-63.6, 63.6)}
     for base, (bx, by) in bases_coords.items():
         is_occ = runners.get(base, False)
         fc = '#FFD166' if is_occ else '#1E293B'
-        ec = '#FFD166' if is_occ else '#64748B'
-        sq = patches.Rectangle((bx - 5, by - 5), 10, 10, angle=45, rotation_point='center', facecolor=fc, edgecolor=ec)
+        ec = '#FFD166' if is_occ else '#94A3B8'
+        sq = patches.Rectangle((bx - 4.5, by - 4.5), 9, 9, angle=45, rotation_point='center', facecolor=fc, edgecolor=ec, zorder=5)
         ax.add_patch(sq)
 
     # Home Plate
-    hp = patches.Polygon([[0, -2], [4, 0], [4, 4], [-4, 4], [-4, 0]], facecolor='#FFFFFF', edgecolor='#FFFFFF')
+    hp = patches.Polygon([[0, 0], [2.5, 2.5], [2.5, 5], [-2.5, 5], [-2.5, 2.5]], facecolor='#FFFFFF', edgecolor='#FFFFFF', zorder=5)
     ax.add_patch(hp)
 
-    # Plot Batted Ball Landing Coordinates with Baseball Markers
+    # Plot Batted Ball Landing Coordinates
     if batted_balls:
         for ball in batted_balls:
             hx, hy = ball.get('x_feet'), ball.get('y_feet')
             if hx is not None and hy is not None:
-                # Plot landing location as a baseball marker
                 ax.plot(
                     hx, hy, 
                     marker='o', 
-                    markersize=9, 
+                    markersize=8, 
                     markerfacecolor='#FFFFFF', 
                     markeredgecolor='#FFD166', 
                     markeredgewidth=1.5,
                     zorder=6
                 )
 
-    ax.set_xlim(-280, 280)
-    ax.set_ylim(-20, 420)
+    ax.set_xlim(-260, 260)
+    ax.set_ylim(-20, 430)
     ax.axis('off')
-    ax.set_title("BALLPARK SPRAY CHART & RUNNERS", fontsize=10, fontweight='bold', color='#8E9AAF', pad=10)
+    ax.set_title(f"SPRAY CHART & RUNNERS — {venue_name.upper()}", fontsize=10, fontweight='bold', color='#8E9AAF', pad=10)
     return fig
 
-# 4. Main App Logic
-game_pk, game_summary = get_today_brewers_game()
+# 4. Main Application Dashboard
+game_pk, game_summary, venue_name = get_today_brewers_game()
 st.subheader(f"Game Status: {game_summary}")
 
 @st.fragment(run_every=15)
-def render_brewers_dashboard(game_pk):
+def render_brewers_dashboard(game_pk, venue_name):
     if not game_pk:
         st.info("Awaiting today's Milwaukee Brewers game schedule.")
         return
@@ -178,7 +211,7 @@ def render_brewers_dashboard(game_pk):
     linescore = live_data.get('linescore', {})
     plays = live_data.get('plays', {}).get('allPlays', [])
 
-    # Score Bug Bar
+    # Scorebug Header
     teams = feed['gameData']['teams']
     away_name = teams['away']['clubName']
     home_name = teams['home']['clubName']
@@ -214,7 +247,7 @@ def render_brewers_dashboard(game_pk):
         </div>
     """, unsafe_allow_html=True)
 
-    # Extract Pitching and Hit Coordinates Data
+    # Process Plays Data
     pitch_list = []
     batted_balls = []
 
@@ -224,7 +257,7 @@ def render_brewers_dashboard(game_pk):
         pitcher = play.get('matchup', {}).get('pitcher', {}).get('fullName', 'Unknown')
         
         for e in p_events:
-            # Check Pitch Data
+            # Pitch Telemetry
             pitch_data = e.get('pitchData', {})
             pfx = pitch_data.get('coordinates', {})
             if 'pfxX' in pfx and 'pfxZ' in pfx:
@@ -236,7 +269,7 @@ def render_brewers_dashboard(game_pk):
                     'vert_break_in': pfx['pfxZ'],
                 })
 
-            # Check Hit Coordinates
+            # Hit Data
             hit_data = e.get('hitData', {})
             if hit_data:
                 hc_x = hit_data.get('coordinates', {}).get('coordX')
@@ -254,18 +287,20 @@ def render_brewers_dashboard(game_pk):
                     'y_feet': fy
                 })
 
-    # Side-By-Side Visuals
-    col_field, col_pitch = st.columns([1.2, 1.8])
+    # Field Spray Chart View
+    runners = {
+        '1b': 'first' in offense,
+        '2b': 'second' in offense,
+        '3b': 'third' in offense
+    }
+    fig_field = draw_full_baseball_field(batted_balls, runners, venue_name)
+    st.pyplot(fig_field, use_container_width=True)
+    plt.close(fig_field)
 
-    with col_field:
-        runners = {
-            '1b': 'first' in offense,
-            '2b': 'second' in offense,
-            '3b': 'third' in offense
-        }
-        fig_field = draw_full_baseball_field(batted_balls, runners)
-        st.pyplot(fig_field)
-        plt.close(fig_field)
+    st.markdown("---")
+
+    # Side-By-Side: Pitch Telemetry & Batted Ball Log
+    col_pitch, col_log = st.columns([1, 1])
 
     with col_pitch:
         st.markdown("**Live Pitch Movement Profile**")
@@ -274,16 +309,15 @@ def render_brewers_dashboard(game_pk):
             latest_p = df_pitches.iloc[-1]
 
             plt.style.use('dark_background')
-            fig, ax = plt.subplots(figsize=(4.5, 4.5))
+            fig, ax = plt.subplots(figsize=(5, 4))
             fig.patch.set_facecolor('#121212')
             ax.set_facecolor('#121212')
 
             sns.scatterplot(
                 data=df_pitches, x='horiz_break_in', y='vert_break_in',
-                hue='pitch_type', s=45, alpha=0.6, ax=ax
+                hue='pitch_type', s=50, alpha=0.6, ax=ax
             )
 
-            # Highlight Latest Pitch
             ax.scatter(
                 latest_p['horiz_break_in'], latest_p['vert_break_in'],
                 color='#FFFFFF', s=140, edgecolor='#00B4D8', linewidth=2.0, label='LATEST', zorder=5
@@ -296,21 +330,21 @@ def render_brewers_dashboard(game_pk):
             ax.set_xlabel("← Glove Side | Arm Side →", fontsize=8, color='#8E9AAF')
             ax.set_ylabel("Induced Vertical Break (in)", fontsize=8, color='#8E9AAF')
 
-            legend = ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=4, frameon=False, fontsize=7)
+            legend = ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=4, frameon=False, fontsize=7)
             for t in legend.get_texts():
                 t.set_color('#FFFFFF')
 
-            st.pyplot(fig)
+            st.pyplot(fig, use_container_width=True)
             plt.close(fig)
         else:
             st.info("Awaiting pitch telemetry...")
 
-    # Batted Ball Log Table
-    st.markdown("### Statcast Batted Ball Log")
-    if batted_balls:
-        df_hits = pd.DataFrame(batted_balls)[['Batter', 'Result', 'Exit Velo (MPH)', 'Launch Angle (°)', 'Distance (ft)', 'xBA']].iloc[::-1]
-        st.dataframe(df_hits, use_container_width=True, hide_index=True)
-    else:
-        st.info("No balls put in play yet for this game.")
+    with col_log:
+        st.markdown("**Statcast Batted Ball Log**")
+        if batted_balls:
+            df_hits = pd.DataFrame(batted_balls)[['Batter', 'Result', 'Exit Velo (MPH)', 'Launch Angle (°)', 'Distance (ft)', 'xBA']].iloc[::-1]
+            st.dataframe(df_hits, use_container_width=True, hide_index=True, height=280)
+        else:
+            st.info("No balls put in play yet for this game.")
 
-render_brewers_dashboard(game_pk)
+render_brewers_dashboard(game_pk, venue_name)
