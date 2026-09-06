@@ -532,7 +532,7 @@ def render_brewers_dashboard(game_pk):
                         'x_feet': fx,
                         'y_feet': fy
                     })
-        half_inning_batted_balls = all_batted[:15]
+        half_inning_batted_balls = all_batted
 
     oot_games = get_league_scoreboard()
     cards = []
