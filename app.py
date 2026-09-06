@@ -123,8 +123,12 @@ st.markdown(f"""
         background-color: {card_bg};
         border: 1px solid {card_border};
         border-radius: 5px;
-        padding: 8px 8px;
+        padding: 18px 8px;
         text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        height: 100%;
     }}
 
     .ticker-teams {{
@@ -138,7 +142,7 @@ st.markdown(f"""
         font-size: 0.7rem;
         font-weight: 500;
         color: {subtext_color};
-        margin-top: 3px;
+        margin-top: 6px;
     }}
     
     [data-testid="stSidebar"] {{display: none;}}
@@ -559,7 +563,7 @@ def render_brewers_dashboard(game_pk):
                 df_pitches, 
                 use_container_width=True, 
                 hide_index=True, 
-                height=560,
+                height=495,
                 column_config={
                     "#": st.column_config.NumberColumn("#", width=30),
                     "Pitch": st.column_config.TextColumn("Pitch", width=45),
@@ -586,7 +590,7 @@ def render_brewers_dashboard(game_pk):
                 df_batted,
                 use_container_width=True,
                 hide_index=True,
-                height=560,
+                height=495,
                 column_config={
                     "Batter": st.column_config.TextColumn("Batter", width=110),
                     "Result": st.column_config.TextColumn("Result", width="medium"),
