@@ -208,11 +208,9 @@ def fetch_live_game_feed(game_pk):
 def convert_hc_to_field_feet(hc_x, hc_y, total_dist=None):
     if hc_x is None or hc_y is None:
         return None, None
-    # Standard Statcast coordinate transformation relative to home plate (0,0)
     x = 2.5 * (hc_x - 125.42)
     y = 2.5 * (198.27 - hc_y)
     
-    # Scale to reported Statcast distance when available for precise placement
     if total_dist and total_dist > 0:
         raw_dist = math.hypot(x, y)
         if raw_dist > 0:
@@ -294,6 +292,8 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
     if batted_balls:
         for ball in batted_balls:
             hx, hy = ball.get('x_feet'), ball.get('y_feet')
+            batter_name = ball.get('Batter', '')
+            short_name = batter_name.split(' ')[-1] if batter_name else ''
             if hx is not None and hy is not None:
                 ax.plot(
                     hx, hy, 
@@ -304,6 +304,15 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
                     markeredgewidth=1.5,
                     zorder=6
                 )
+                if short_name:
+                    ax.text(
+                        hx + 6, hy + 6, short_name,
+                        fontsize=7,
+                        fontweight='bold',
+                        color='#FFFFFF' if is_dark else '#0F172A',
+                        fontfamily='Fira Code',
+                        zorder=7
+                    )
 
     ax.set_xlim(-250, 250)
     ax.set_ylim(-20, 420)
@@ -380,6 +389,7 @@ def render_brewers_dashboard(game_pk):
         pitcher_id = defense.get('pitcher', {}).get('id')
         current_play = plays[-1] if plays else None
 
+        pitch_global_idx = 1
         for idx, p in enumerate(plays):
             if p.get('matchup', {}).get('pitcher', {}).get('id') == pitcher_id:
                 p_events = p.get('playEvents', [])
@@ -387,11 +397,18 @@ def render_brewers_dashboard(game_pk):
                     if e.get('isPitch'):
                         pitch_count += 1
             
-            play_wp = p.get('about', {}).get('homeWinProbability')
-            if play_wp is not None:
-                win_probs.append({'play_idx': idx + 1, 'home_wp': play_wp})
+            p_events = p.get('playEvents', [])
+            for e in p_events:
+                if e.get('isPitch'):
+                    event_wp = e.get('homeWinProbability') or p.get('about', {}).get('homeWinProbability')
+                    if event_wp is not None:
+                        win_probs.append({'pitch_idx': pitch_global_idx, 'home_wp': event_wp})
+                    pitch_global_idx += 1
+            
+            if not win_probs and p.get('about', {}).get('homeWinProbability') is not None:
+                win_probs.append({'pitch_idx': pitch_global_idx, 'home_wp': p.get('about', {}).get('homeWinProbability')})
 
-        # 1. Pitch-By-Pitch for Current At-Bat (Abbreviated Pitch Names, No Zone Column)
+        # 1. Pitch-By-Pitch for Current At-Bat
         if current_play:
             p_events = current_play.get('playEvents', [])
             p_num = 1
@@ -401,7 +418,6 @@ def render_brewers_dashboard(game_pk):
                     details = e.get('details', {})
                     
                     type_info = details.get('type', {})
-                    # Use Statcast pitch code abbreviation (e.g., FF, SL, CU, CH)
                     pitch_abbrev = type_info.get('code', type_info.get('description', 'P'))
                     
                     velo = p_data.get('startSpeed', 'N/A')
@@ -510,7 +526,7 @@ def render_brewers_dashboard(game_pk):
         plt.close(fig_field)
 
     with col_right:
-        st.markdown("**Live Win Probability**")
+        st.markdown("**Live Win Probability (Per Pitch)**")
         if win_probs:
             df_wp = pd.DataFrame(win_probs)
             
@@ -519,10 +535,11 @@ def render_brewers_dashboard(game_pk):
             fig_wp.patch.set_facecolor(bg_color)
             ax_wp.set_facecolor(bg_color)
 
-            ax_wp.plot(df_wp['play_idx'], df_wp['home_wp'], color='#00B4D8', linewidth=2)
+            ax_wp.plot(df_wp['pitch_idx'], df_wp['home_wp'], color='#00B4D8', linewidth=2, marker='o', markersize=3)
             ax_wp.axhline(50, color=card_border, linestyle='--', linewidth=1)
 
             ax_wp.set_ylim(0, 100)
+            ax_wp.set_xlabel("Pitch Index", fontsize=6, color=subtext_color, fontfamily='Fira Code')
             ax_wp.set_ylabel(f"{home_name[:3].upper()} Win %", fontsize=7, color=subtext_color, fontfamily='Fira Code')
             ax_wp.tick_params(colors=subtext_color, labelsize=6)
             
@@ -532,7 +549,7 @@ def render_brewers_dashboard(game_pk):
             st.pyplot(fig_wp, use_container_width=True)
             plt.close(fig_wp)
         else:
-            st.info("Win probability timeline will plot as plays occur.")
+            st.info("Win probability timeline will plot as pitches occur.")
 
         st.html(f'''
             <div class="ticker-container">
@@ -553,7 +570,14 @@ def render_brewers_dashboard(game_pk):
                     df_pitches, 
                     use_container_width=True, 
                     hide_index=True, 
-                    height=280
+                    height=410,
+                    column_config={
+                        "#": st.column_config.NumberColumn("#", width="small"),
+                        "Pitch": st.column_config.TextColumn("Pitch", width="small"),
+                        "Velo": st.column_config.TextColumn("Velo", width="medium"),
+                        "Spin": st.column_config.TextColumn("Spin", width="medium"),
+                        "Result": st.column_config.TextColumn("Result", width="large")
+                    }
                 )
             else:
                 st.info("Awaiting pitches for current at-bat...")
@@ -566,7 +590,7 @@ def render_brewers_dashboard(game_pk):
                     df_batted,
                     use_container_width=True,
                     hide_index=True,
-                    height=280
+                    height=410
                 )
             else:
                 st.info("No balls in play this half-inning.")
