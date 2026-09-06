@@ -95,12 +95,13 @@ st.markdown(f"""
         background-color: {ticker_bg};
         border: 1px solid {card_border};
         border-radius: 8px;
-        padding: 12px 14px;
-        margin-top: 10px;
+        padding: 24px 18px;
+        margin-top: 0px;
         margin-bottom: 10px;
         display: flex;
         flex-direction: column;
         justify-content: center;
+        min-height: 145px;
     }}
 
     .ticker-header {{
@@ -396,7 +397,6 @@ def render_brewers_dashboard(game_pk):
     in_hole_name = players_dict.get(f"ID{in_hole_id}", {}).get('fullName', 'N/A') if in_hole_id else 'N/A'
 
     pitch_count = 0
-    win_probs = []
     current_ab_pitches = []
     half_inning_batted_balls = []
 
@@ -404,32 +404,12 @@ def render_brewers_dashboard(game_pk):
         pitcher_id = defense.get('pitcher', {}).get('id')
         current_play = plays[-1] if plays else None
 
-        for idx, p in enumerate(plays):
+        for p in plays:
             if p.get('matchup', {}).get('pitcher', {}).get('id') == pitcher_id:
                 p_events = p.get('playEvents', [])
                 for e in p_events:
                     if e.get('isPitch'):
                         pitch_count += 1
-            
-            about = p.get('about', {})
-            
-            # Accurate Win Probability tracking logic
-            top_bottom = about.get('halfInning', '')
-            inn = about.get('inning', 1)
-            
-            # Check for home win probability from standard API structure first
-            wp = about.get('homeWinProbability')
-            if wp is not None:
-                home_wp_val = wp * 100.0 if wp <= 1.0 else wp
-            else:
-                # Fallback calculation if explicit field is missing
-                home_wp_val = 50.0
-
-            win_probs.append({
-                'play_idx': idx + 1, 
-                'home_wp': home_wp_val,
-                'label': f"Inn {inn} ({top_bottom})"
-            })
 
         # 1. Pitch-By-Pitch for Current At-Bat
         if current_play:
@@ -552,33 +532,6 @@ def render_brewers_dashboard(game_pk):
         plt.close(fig_field)
 
     with col_right:
-        st.markdown("**Live Win Probability (Per Play)**")
-        if win_probs:
-            df_wp = pd.DataFrame(win_probs)
-            
-            plt.style.use('dark_background' if is_dark else 'default')
-            fig_wp, ax_wp = plt.subplots(figsize=(8, 1.8))
-            fig_wp.patch.set_facecolor(bg_color)
-            ax_wp.set_facecolor(bg_color)
-
-            # Correctly plot the home win probability trend line correctly mapped between 0 and 100%
-            ax_wp.plot(df_wp['play_idx'], df_wp['home_wp'], color='#00B4D8', linewidth=2, marker='o', markersize=3)
-            ax_wp.axhline(50, color=card_border, linestyle='--', linewidth=1)
-
-            ax_wp.set_ylim(0, 100)
-            ax_wp.set_xlim(1, max(df_wp['play_idx'].max(), 5))
-            ax_wp.set_xlabel("Play Index", fontsize=6, color=subtext_color, fontfamily='Fira Code')
-            ax_wp.set_ylabel(f"{home_name[:3].upper()} Win %", fontsize=7, color=subtext_color, fontfamily='Fira Code')
-            ax_wp.tick_params(colors=subtext_color, labelsize=6)
-            
-            for spine in ax_wp.spines.values():
-                spine.set_color(card_border)
-
-            st.pyplot(fig_wp, use_container_width=True)
-            plt.close(fig_wp)
-        else:
-            st.info("Win probability timeline will plot as plays occur.")
-
         st.html(f'''
             <div class="ticker-container">
                 <div class="ticker-header">OUT-OF-TOWN SCOREBOARD ↻ 15s</div>
@@ -592,7 +545,6 @@ def render_brewers_dashboard(game_pk):
 
         with col_pitch:
             st.markdown("**Current At-Bat Pitch Log**")
-            # Pad or configure row limits to 15 entries
             while len(current_ab_pitches) < 15:
                 current_ab_pitches.append({
                     '#': len(current_ab_pitches) + 1,
@@ -607,7 +559,7 @@ def render_brewers_dashboard(game_pk):
                 df_pitches, 
                 use_container_width=True, 
                 hide_index=True, 
-                height=240,
+                height=560,
                 column_config={
                     "#": st.column_config.NumberColumn("#", width=30),
                     "Pitch": st.column_config.TextColumn("Pitch", width=45),
@@ -634,7 +586,7 @@ def render_brewers_dashboard(game_pk):
                 df_batted,
                 use_container_width=True,
                 hide_index=True,
-                height=240,
+                height=560,
                 column_config={
                     "Batter": st.column_config.TextColumn("Batter", width=110),
                     "Result": st.column_config.TextColumn("Result", width="medium"),
