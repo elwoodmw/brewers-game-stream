@@ -365,11 +365,14 @@ def render_brewers_dashboard(game_pk):
 
     pitch_count = 0
     win_probs = []
-    pitch_list = []
-    batted_balls = []
+    current_ab_pitches = []
+    half_inning_batted_balls = []
 
     if plays:
         pitcher_id = defense.get('pitcher', {}).get('id')
+        current_play = plays[-1] if plays else None
+
+        # Calculate pitch count & win probabilities
         for idx, p in enumerate(plays):
             if p.get('matchup', {}).get('pitcher', {}).get('id') == pitcher_id:
                 p_events = p.get('playEvents', [])
@@ -381,35 +384,53 @@ def render_brewers_dashboard(game_pk):
             if play_wp is not None:
                 win_probs.append({'play_idx': idx + 1, 'home_wp': play_wp})
 
-            p_events = p.get('playEvents', [])
-            batter = p.get('matchup', {}).get('batter', {}).get('fullName', 'Unknown')
-            pitcher = p.get('matchup', {}).get('pitcher', {}).get('fullName', 'Unknown')
-            
+        # 1. Pitch-By-Pitch for Current At-Bat Only (Resets every at-bat)
+        if current_play:
+            p_events = current_play.get('playEvents', [])
+            p_num = 1
             for e in p_events:
-                pitch_data = e.get('pitchData', {})
-                pfx = pitch_data.get('coordinates', {})
-                if 'pfxX' in pfx and 'pfxZ' in pfx:
-                    pitch_type = e.get('details', {}).get('type', {}).get('code', 'UN')
-                    pitch_list.append({
-                        'pitcher': pitcher,
-                        'pitch_type': pitch_type,
-                        'horiz_break_in': pfx['pfxX'],
-                        'vert_break_in': pfx['pfxZ'],
-                    })
+                if e.get('isPitch'):
+                    p_data = e.get('pitchData', {})
+                    details = e.get('details', {})
+                    
+                    velo = p_data.get('startSpeed', 'N/A')
+                    spin = p_data.get('breaks', {}).get('spinRate', 'N/A')
+                    zone = p_data.get('zone', 'N/A')
+                    res = details.get('description', 'N/A')
 
+                    current_ab_pitches.append({
+                        '#': p_num,
+                        'Pitch': details.get('type', {}).get('description', 'Pitch'),
+                        'Velo': f"{velo} mph" if velo != 'N/A' else 'N/A',
+                        'Spin': f"{spin} rpm" if spin != 'N/A' else 'N/A',
+                        'Zone': zone,
+                        'Result': res
+                    })
+                    p_num += 1
+
+        # 2. Batted Balls & Spray Chart (Resets every half-inning)
+        target_half = 'top' if inning_state.lower() in ['top', 'top 1', 't'] else 'bottom'
+        current_inning_plays = [
+            p for p in plays 
+            if p.get('about', {}).get('inning') == inning_num 
+            and p.get('about', {}).get('halfInning', '').lower() == target_half
+        ]
+
+        for p in current_inning_plays:
+            batter = p.get('matchup', {}).get('batter', {}).get('fullName', 'Unknown')
+            for e in p.get('playEvents', []):
                 hit_data = e.get('hitData', {})
                 if hit_data:
-                    hc_x = hit_data.get('coordinates', {}).get('coordX')
-                    hc_y = hit_data.get('coordinates', {}).get('coordY')
-                    fx, fy = convert_hc_to_field_feet(hc_x, hc_y)
-                    
-                    batted_balls.append({
-                        'Batter': batter,
-                        'Result': p.get('result', {}).get('event', 'In Play'),
-                        'Exit Velo (MPH)': hit_data.get('launchSpeed', 'N/A'),
-                        'Launch Angle (°)': hit_data.get('launchAngle', 'N/A'),
-                        'Distance (ft)': hit_data.get('totalDistance', 'N/A'),
-                        'xBA': hit_data.get('expectedBattingAverage', 'N/A'),
+                    fx, fy = convert_hc_to_field_feet(
+                        hit_data.get('coordinates', {}).get('coordX'),
+                        hit_data.get('coordinates', {}).get('coordY')
+                    )
+                    half_inning_batted_balls.append({
+                        'batter': batter,
+                        'event': p.get('result', {}).get('event', 'In Play'),
+                        'ev': hit_data.get('launchSpeed', 'N/A'),
+                        'la': hit_data.get('launchAngle', 'N/A'),
+                        'dist': hit_data.get('totalDistance', 'N/A'),
                         'x_feet': fx,
                         'y_feet': fy
                     })
@@ -473,7 +494,7 @@ def render_brewers_dashboard(game_pk):
             '2b': 'second' in offense,
             '3b': 'third' in offense
         }
-        fig_field = draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark)
+        fig_field = draw_full_baseball_field(half_inning_batted_balls, runners, field_title_label, is_dark)
         st.pyplot(fig_field, use_container_width=True)
         plt.close(fig_field)
 
@@ -514,50 +535,27 @@ def render_brewers_dashboard(game_pk):
         col_pitch, col_log = st.columns([1, 1])
 
         with col_pitch:
-            st.markdown("**Live Pitch Movement**")
-            if pitch_list:
-                df_pitches = pd.DataFrame(pitch_list)
-                latest_p = df_pitches.iloc[-1]
-
-                plt.style.use('dark_background' if is_dark else 'default')
-                fig, ax = plt.subplots(figsize=(4, 4))
-                fig.patch.set_facecolor(bg_color)
-                ax.set_facecolor(bg_color)
-
-                sns.scatterplot(
-                    data=df_pitches, x='horiz_break_in', y='vert_break_in',
-                    hue='pitch_type', s=45, alpha=0.6, ax=ax
+            st.markdown("**Current At-Bat Pitch Log**")
+            if current_ab_pitches:
+                df_pitches = pd.DataFrame(current_ab_pitches)
+                st.dataframe(
+                    df_pitches, 
+                    use_container_width=True, 
+                    hide_index=True, 
+                    height=280
                 )
-
-                ax.scatter(
-                    latest_p['horiz_break_in'], latest_p['vert_break_in'],
-                    color='#FFFFFF' if is_dark else '#000000', s=120, edgecolor='#00B4D8', linewidth=2.0, label='LATEST', zorder=5
-                )
-
-                ax.axhline(0, color=card_border, linewidth=1.2)
-                ax.axvline(0, color=card_border, linewidth=1.2)
-                ax.set_xlim(25, -25)
-                ax.set_ylim(-25, 25)
-                ax.set_xlabel("← Glove | Arm →", fontsize=7, color=subtext_color, fontfamily='Fira Code')
-                ax.set_ylabel("IVB (in)", fontsize=7, color=subtext_color, fontfamily='Fira Code')
-
-                legend = ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False, fontsize=6)
-                if legend:
-                    for t in legend.get_texts():
-                        t.set_color(text_color)
-                        t.set_fontfamily('Fira Code')
-
-                st.pyplot(fig, use_container_width=True)
-                plt.close(fig)
             else:
-                st.info("Awaiting pitch telemetry...")
+                st.info("Awaiting pitches for current at-bat...")
 
         with col_log:
-            st.markdown("**Batted Ball Log**")
-            if batted_balls:
-                df_hits = pd.DataFrame(batted_balls)[['Batter', 'Result', 'Exit Velo (MPH)', 'Launch Angle (°)', 'Distance (ft)', 'xBA']].iloc[::-1]
-                st.dataframe(df_hits, use_container_width=True, hide_index=True, height=280)
+            st.markdown(f"**Half-Inning Batted Balls ({inning_state} {inning_num})**")
+            if half_inning_batted_balls:
+                for hit in reversed(half_inning_batted_balls):
+                    st.markdown(
+                        f"• **{hit['batter']}**: {hit['event']} "
+                        f"({hit['ev']} mph, {hit['la']}°, {hit['dist']} ft)"
+                    )
             else:
-                st.info("No balls in play yet.")
+                st.info("No balls in play this half-inning.")
 
 render_brewers_dashboard(game_pk)
