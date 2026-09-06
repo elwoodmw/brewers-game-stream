@@ -45,7 +45,7 @@ st.markdown("""
         border: 1px solid #334155;
         border-radius: 8px;
         padding: 10px 16px;
-        height: 85px;
+        height: 90px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -55,11 +55,47 @@ st.markdown("""
         background-color: #0F172A;
         border: 1px solid #1E293B;
         border-radius: 8px;
-        padding: 10px 16px;
-        height: 85px;
+        padding: 8px 14px;
+        height: 90px;
         display: flex;
         flex-direction: column;
         justify-content: center;
+    }
+
+    .ticker-header {
+        font-size: 0.7rem;
+        font-weight: 800;
+        color: #00B4D8;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+    }
+
+    .ticker-games-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .ticker-card {
+        background-color: #1E293B;
+        border: 1px solid #334155;
+        border-radius: 5px;
+        padding: 4px 8px;
+        text-align: center;
+    }
+
+    .ticker-teams {
+        font-size: 0.85rem;
+        font-weight: 800;
+        color: #FFFFFF;
+    }
+
+    .ticker-status {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #94A3B8;
+        margin-top: 1px;
     }
     
     [data-testid="stSidebar"] {visibility: hidden; width: 0px; display: none;}
@@ -101,11 +137,10 @@ def get_today_brewers_game():
 
 @st.cache_data(ttl=120)
 def get_league_scoreboard():
-    """Fetch all MLB games scheduled for today for the out-of-town ticker."""
+    """Fetch all non-Brewers MLB games scheduled for today."""
     today_str = datetime.date.today().strftime('%Y-%m-%d')
     try:
         schedule = statsapi.schedule(date=today_str)
-        # Filter out Brewers games so ticker only shows out-of-town scores
         out_of_town = [
             g for g in schedule 
             if g.get('away_id') != BREWERS_TEAM_ID and g.get('home_id') != BREWERS_TEAM_ID
@@ -129,6 +164,18 @@ def convert_hc_to_field_feet(hc_x, hc_y):
     x_feet = (hc_x - 126) * 2.29
     y_feet = (204 - hc_y) * 2.29
     return x_feet, y_feet
+
+# Helper to shorten inning/status strings for compact cards
+def format_compact_status(status_str):
+    if "Inning" in status_str or "Top" in status_str or "Bottom" in status_str or "Bot" in status_str or "Mid" in status_str or "End" in status_str:
+        return status_str.replace("Top ", "T").replace("Bottom ", "B").replace("Bot ", "B").replace("End ", "E").replace("Mid ", "M")
+    elif "Final" in status_str:
+        return "FINAL"
+    elif "Scheduled" in status_str or "Pre-Game" in status_str:
+        return "PRE"
+    elif "Warmup" in status_str:
+        return "WARM"
+    return status_str[:6].upper()
 
 # 3. Field Plotting
 def draw_full_baseball_field(batted_balls, runners, field_title_label):
@@ -255,21 +302,35 @@ def render_brewers_dashboard(game_pk):
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
 
-    # Out-of-town scores setup
+    # Out-of-town scores setup: select 3 games at a time
     oot_games = get_league_scoreboard()
+    ticker_cards_html = ""
+    
     if oot_games:
-        st.session_state.ticker_idx = (st.session_state.ticker_idx + 1) % len(oot_games)
-        curr_oot = oot_games[st.session_state.ticker_idx]
-        oot_away = curr_oot.get('away_name', 'Away')
-        oot_home = curr_oot.get('home_name', 'Home')
-        oot_away_score = curr_oot.get('away_score', 0)
-        oot_home_score = curr_oot.get('home_score', 0)
-        oot_status = curr_oot.get('status', 'Scheduled')
+        n_games = len(oot_games)
+        st.session_state.ticker_idx = (st.session_state.ticker_idx + 3) % n_games
+        
+        # Pick 3 consecutive games
+        selected_games = [oot_games[(st.session_state.ticker_idx + i) % n_games] for i in range(min(3, n_games))]
+        
+        for g in selected_games:
+            away_abbrev = g.get('away_abbrev', g.get('away_name', 'AWY')[:3]).upper()
+            home_abbrev = g.get('home_abbrev', g.get('home_name', 'HME')[:3]).upper()
+            a_score = g.get('away_score', 0)
+            h_score = g.get('home_score', 0)
+            status = format_compact_status(g.get('status', 'PRE'))
+            
+            ticker_cards_html += f"""
+                <div class="ticker-card">
+                    <div class="ticker-teams">{away_abbrev} <span style="color:#FFD166;">{a_score}</span> @ <span style="color:#FFD166;">{h_score}</span> {home_abbrev}</div>
+                    <div class="ticker-status">{status}</div>
+                </div>
+            """
     else:
-        oot_away, oot_home, oot_away_score, oot_home_score, oot_status = "N/A", "N/A", 0, 0, "No Games"
+        ticker_cards_html = """<div style="color: #94A3B8; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>"""
 
-    # Header Row: Compact Scorebug (60%) + Out-of-Town Ticker (40%)
-    col_scorebug, col_ticker = st.columns([1.5, 1])
+    # 50/50 Split Header
+    col_scorebug, col_ticker = st.columns([1, 1])
 
     with col_scorebug:
         st.markdown(f"""
@@ -292,16 +353,9 @@ def render_brewers_dashboard(game_pk):
     with col_ticker:
         st.markdown(f"""
             <div class="ticker-container">
-                <div style="font-size: 0.7rem; font-weight: 800; color: #00B4D8; letter-spacing: 0.05em; margin-bottom: 2px;">
-                    OUT-OF-TOWN SCOREBOARD ↻ 15s
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 1.05rem; font-weight: 800;">
-                        {oot_away} <span style="color:#FFD166;">{oot_away_score}</span> @ <span style="color:#FFD166;">{oot_home_score}</span> {oot_home}
-                    </div>
-                    <div style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">
-                        {oot_status}
-                    </div>
+                <div class="ticker-header">OUT-OF-TOWN SCOREBOARD ↻ 15s</div>
+                <div class="ticker-games-grid">
+                    {ticker_cards_html}
                 </div>
             </div>
         """, unsafe_allow_html=True)
