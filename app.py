@@ -389,7 +389,6 @@ def render_brewers_dashboard(game_pk):
         pitcher_id = defense.get('pitcher', {}).get('id')
         current_play = plays[-1] if plays else None
 
-        pitch_global_idx = 1
         for idx, p in enumerate(plays):
             if p.get('matchup', {}).get('pitcher', {}).get('id') == pitcher_id:
                 p_events = p.get('playEvents', [])
@@ -397,43 +396,40 @@ def render_brewers_dashboard(game_pk):
                     if e.get('isPitch'):
                         pitch_count += 1
             
-            p_events = p.get('playEvents', [])
-            for e in p_events:
-                if e.get('isPitch'):
-                    event_wp = e.get('homeWinProbability') or p.get('about', {}).get('homeWinProbability')
-                    if event_wp is not None:
-                        win_probs.append({'pitch_idx': pitch_global_idx, 'home_wp': event_wp})
-                    pitch_global_idx += 1
-            
-            if not win_probs and p.get('about', {}).get('homeWinProbability') is not None:
-                win_probs.append({'pitch_idx': pitch_global_idx, 'home_wp': p.get('about', {}).get('homeWinProbability')})
+            about = p.get('about', {})
+            wp = about.get('homeWinProbability')
+            if wp is not None:
+                win_probs.append({'play_idx': idx + 1, 'home_wp': wp})
 
-        # 1. Pitch-By-Pitch for Current At-Bat
+        # 1. Pitch-By-Pitch for Current At-Bat (holding up to 12 recent pitches)
         if current_play:
             p_events = current_play.get('playEvents', [])
-            p_num = 1
-            for e in p_events:
-                if e.get('isPitch'):
-                    p_data = e.get('pitchData', {})
-                    details = e.get('details', {})
-                    
-                    type_info = details.get('type', {})
-                    pitch_abbrev = type_info.get('code', type_info.get('description', 'P'))
-                    
-                    velo = p_data.get('startSpeed', 'N/A')
-                    spin = p_data.get('breaks', {}).get('spinRate', 'N/A')
-                    res = details.get('description', 'N/A')
+            pitch_events_list = [e for e in p_events if e.get('isPitch')]
+            # Take last 12 pitches if more than 12
+            recent_pitch_events = pitch_events_list[-12:]
+            
+            p_num = max(1, len(pitch_events_list) - len(recent_pitch_events) + 1)
+            for e in recent_pitch_events:
+                p_data = e.get('pitchData', {})
+                details = e.get('details', {})
+                
+                type_info = details.get('type', {})
+                pitch_abbrev = type_info.get('code', type_info.get('description', 'P'))
+                
+                velo = p_data.get('startSpeed', 'N/A')
+                spin = p_data.get('breaks', {}).get('spinRate', 'N/A')
+                res = details.get('description', 'N/A')
 
-                    current_ab_pitches.append({
-                        '#': p_num,
-                        'Pitch': pitch_abbrev,
-                        'Velo': f"{velo} mph" if velo != 'N/A' else 'N/A',
-                        'Spin': f"{spin} rpm" if spin != 'N/A' else 'N/A',
-                        'Result': res
-                    })
-                    p_num += 1
+                current_ab_pitches.append({
+                    '#': p_num,
+                    'Pitch': pitch_abbrev,
+                    'Velo': f"{velo} mph" if velo != 'N/A' else 'N/A',
+                    'Spin': f"{spin} rpm" if spin != 'N/A' else 'N/A',
+                    'Result': res
+                })
+                p_num += 1
 
-        # 2. Batted Balls Log & Spray Chart
+        # 2. Batted Balls Log & Spray Chart (holding up to 12 recent batted balls)
         target_half = 'top' if inning_state.lower() in ['top', 'top 1', 't'] else 'bottom'
         current_inning_plays = [
             p for p in plays 
@@ -441,6 +437,7 @@ def render_brewers_dashboard(game_pk):
             and p.get('about', {}).get('halfInning', '').lower() == target_half
         ]
 
+        all_batted = []
         for p in current_inning_plays:
             batter = p.get('matchup', {}).get('batter', {}).get('fullName', 'Unknown')
             for e in p.get('playEvents', []):
@@ -452,7 +449,7 @@ def render_brewers_dashboard(game_pk):
                         hit_data.get('coordinates', {}).get('coordY'),
                         total_dist=dist
                     )
-                    half_inning_batted_balls.append({
+                    all_batted.append({
                         'Batter': batter,
                         'Result': p.get('result', {}).get('event', 'In Play'),
                         'EV (mph)': hit_data.get('launchSpeed', 'N/A'),
@@ -461,6 +458,7 @@ def render_brewers_dashboard(game_pk):
                         'x_feet': fx,
                         'y_feet': fy
                     })
+        half_inning_batted_balls = all_batted[-12:]
 
     oot_games = get_league_scoreboard()
     cards = []
@@ -526,7 +524,7 @@ def render_brewers_dashboard(game_pk):
         plt.close(fig_field)
 
     with col_right:
-        st.markdown("**Live Win Probability (Per Pitch)**")
+        st.markdown("**Live Win Probability (Per Play)**")
         if win_probs:
             df_wp = pd.DataFrame(win_probs)
             
@@ -535,11 +533,11 @@ def render_brewers_dashboard(game_pk):
             fig_wp.patch.set_facecolor(bg_color)
             ax_wp.set_facecolor(bg_color)
 
-            ax_wp.plot(df_wp['pitch_idx'], df_wp['home_wp'], color='#00B4D8', linewidth=2, marker='o', markersize=3)
+            ax_wp.plot(df_wp['play_idx'], df_wp['home_wp'], color='#00B4D8', linewidth=2, marker='o', markersize=3)
             ax_wp.axhline(50, color=card_border, linestyle='--', linewidth=1)
 
             ax_wp.set_ylim(0, 100)
-            ax_wp.set_xlabel("Pitch Index", fontsize=6, color=subtext_color, fontfamily='Fira Code')
+            ax_wp.set_xlabel("Play Index", fontsize=6, color=subtext_color, fontfamily='Fira Code')
             ax_wp.set_ylabel(f"{home_name[:3].upper()} Win %", fontsize=7, color=subtext_color, fontfamily='Fira Code')
             ax_wp.tick_params(colors=subtext_color, labelsize=6)
             
@@ -549,7 +547,7 @@ def render_brewers_dashboard(game_pk):
             st.pyplot(fig_wp, use_container_width=True)
             plt.close(fig_wp)
         else:
-            st.info("Win probability timeline will plot as pitches occur.")
+            st.info("Win probability timeline will plot as plays occur.")
 
         st.html(f'''
             <div class="ticker-container">
@@ -563,19 +561,19 @@ def render_brewers_dashboard(game_pk):
         col_pitch, col_log = st.columns([1, 1])
 
         with col_pitch:
-            st.markdown("**Current At-Bat Pitch Log**")
+            st.markdown("**Current At-Bat Pitch Log (Up to 12)**")
             if current_ab_pitches:
                 df_pitches = pd.DataFrame(current_ab_pitches)
                 st.dataframe(
                     df_pitches, 
                     use_container_width=True, 
                     hide_index=True, 
-                    height=410,
+                    height=500,
                     column_config={
                         "#": st.column_config.NumberColumn("#", width="small"),
                         "Pitch": st.column_config.TextColumn("Pitch", width="small"),
-                        "Velo": st.column_config.TextColumn("Velo", width="medium"),
-                        "Spin": st.column_config.TextColumn("Spin", width="medium"),
+                        "Velo": st.column_config.TextColumn("Velo", width="small"),
+                        "Spin": st.column_config.TextColumn("Spin", width="small"),
                         "Result": st.column_config.TextColumn("Result", width="large")
                     }
                 )
@@ -590,7 +588,14 @@ def render_brewers_dashboard(game_pk):
                     df_batted,
                     use_container_width=True,
                     hide_index=True,
-                    height=410
+                    height=500,
+                    column_config={
+                        "Batter": st.column_config.TextColumn("Batter", width="medium"),
+                        "Result": st.column_config.TextColumn("Result", width="medium"),
+                        "EV (mph)": st.column_config.TextColumn("EV (mph)", width="small"),
+                        "LA (°)": st.column_config.TextColumn("LA (°)", width="small"),
+                        "Dist (ft)": st.column_config.TextColumn("Dist (ft)", width="small")
+                    }
                 )
             else:
                 st.info("No balls in play this half-inning.")
