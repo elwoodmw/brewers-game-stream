@@ -4,5 +4,4 @@ numpy
 matplotlib
 seaborn
 pybaseball
-MLB-StatsAPI
-streamlit-autorun
+mlb-statsapi
