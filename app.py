@@ -66,7 +66,7 @@ st.markdown(f"""
         border: 1px solid {card_border};
         border-radius: 8px;
         padding: 10px 16px;
-        height: 90px;
+        height: 100px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -77,7 +77,9 @@ st.markdown(f"""
         border: 1px solid {card_border};
         border-radius: 8px;
         padding: 8px 14px;
-        height: 90px;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        height: 80px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -93,7 +95,7 @@ st.markdown(f"""
 
     .ticker-games-grid {{
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: repeat(6, 1fr);
         gap: 8px;
         align-items: center;
     }}
@@ -107,13 +109,13 @@ st.markdown(f"""
     }}
 
     .ticker-teams {{
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         font-weight: 800;
         color: {text_color};
     }}
 
     .ticker-status {{
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         font-weight: 600;
         color: {subtext_color};
         margin-top: 1px;
@@ -187,8 +189,8 @@ def fetch_live_game_feed(game_pk):
 def convert_hc_to_field_feet(hc_x, hc_y):
     if hc_x is None or hc_y is None:
         return None, None
-    x_feet = (hc_x - 126) * 2.29
-    y_feet = (204 - hc_y) * 2.29
+    x_feet = 2.5 * (hc_x - 125.42)
+    y_feet = 2.5 * (198.27 - hc_y)
     return x_feet, y_feet
 
 def format_compact_status(status_str):
@@ -211,6 +213,7 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
     
     fig.patch.set_facecolor(bg_c)
     ax.set_facecolor(bg_c)
+    ax.set_aspect('equal', adjustable='box')
 
     venue_key = next((k for k in STADIUM_DIMENSIONS if k.lower() in field_title_label.lower()), None)
     dims = STADIUM_DIMENSIONS.get(venue_key, DEFAULT_DIMS)
@@ -232,27 +235,28 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
 
     ax.plot([0, wall_x[0]], [0, wall_y[0]], color='#64748B', linewidth=1.5)
     ax.plot([0, wall_x[-1]], [0, wall_y[-1]], color='#64748B', linewidth=1.5)
-    ax.plot(wall_x, wall_y, color=border_c, linewidth=4)
-    ax.plot(wall_x, wall_y, color='#00B4D8', linewidth=1.5, linestyle='--')
+    
+    ax.plot(wall_x, wall_y, color=border_c, linewidth=3)
+    ax.plot(wall_x, wall_y, color='#00B4D8', linewidth=1.2, linestyle='--')
 
-    dirt_arc = patches.Arc((0, 60.5), 190, 190, angle=0, theta1=20, theta2=160, color=border_c, linewidth=1.5)
+    dirt_arc = patches.Arc((0, 60.5), 190, 190, angle=0, theta1=225, theta2=315, color=border_c, linewidth=1.5)
     ax.add_patch(dirt_arc)
 
-    infield_x = [0, 63.6, 0, -63.6, 0]
-    infield_y = [0, 63.6, 127.3, 63.6, 0]
-    ax.plot(infield_x, infield_y, color=line_c, linewidth=1.8)
+    infield_x = [0, 63.64, 0, -63.64, 0]
+    infield_y = [0, 63.64, 127.28, 63.64, 0]
+    ax.plot(infield_x, infield_y, color=line_c, linewidth=1.5)
 
     mound = patches.Circle((0, 60.5), radius=9, facecolor=border_c, edgecolor=line_c, linewidth=1)
-    rubber = patches.Rectangle((-1.5, 60), 3, 1, facecolor='#FFFFFF', edgecolor='#FFFFFF')
+    rubber = patches.Rectangle((-1.25, 60), 2.5, 0.8, facecolor='#FFFFFF', edgecolor='#FFFFFF')
     ax.add_patch(mound)
     ax.add_patch(rubber)
 
-    bases_coords = {'1b': (63.6, 63.6), '2b': (0, 127.3), '3b': (-63.6, 63.6)}
+    bases_coords = {'1b': (63.64, 63.64), '2b': (0, 127.28), '3b': (-63.64, 63.64)}
     for base, (bx, by) in bases_coords.items():
         is_occ = runners.get(base, False)
         fc = '#FFD166' if is_occ else border_c
         ec = '#FFD166' if is_occ else '#94A3B8'
-        sq = patches.Rectangle((bx - 4.5, by - 4.5), 9, 9, angle=45, rotation_point='center', facecolor=fc, edgecolor=ec, zorder=5)
+        sq = patches.Rectangle((bx - 3.5, by - 3.5), 7, 7, angle=45, rotation_point='center', facecolor=fc, edgecolor=ec, zorder=5)
         ax.add_patch(sq)
 
     hp = patches.Polygon([[0, 0], [2.5, 2.5], [2.5, 5], [-2.5, 5], [-2.5, 2.5]], facecolor='#FFFFFF', edgecolor='#FFFFFF', zorder=5)
@@ -265,15 +269,15 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
                 ax.plot(
                     hx, hy, 
                     marker='o', 
-                    markersize=8, 
+                    markersize=7, 
                     markerfacecolor='#FFFFFF', 
                     markeredgecolor='#FFD166', 
                     markeredgewidth=1.5,
                     zorder=6
                 )
 
-    ax.set_xlim(-260, 260)
-    ax.set_ylim(-20, 430)
+    ax.set_xlim(-250, 250)
+    ax.set_ylim(-20, 420)
     ax.axis('off')
     ax.set_title(field_title_label, fontsize=9, fontweight='bold', color=subtext_color, pad=10)
     return fig
@@ -331,34 +335,76 @@ def render_brewers_dashboard(game_pk):
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
 
-    # Pitch Count calculation
+    # Pitch Count & Win Probability tracking
     pitch_count = 0
     win_probs = []
 
     if plays:
         pitcher_id = defense.get('pitcher', {}).get('id')
         for idx, p in enumerate(plays):
-            # Track pitch count
             if p.get('matchup', {}).get('pitcher', {}).get('id') == pitcher_id:
                 p_events = p.get('playEvents', [])
                 for e in p_events:
                     if e.get('isPitch'):
                         pitch_count += 1
             
-            # Track Win Probability
-            p_end = p.get('playEndTime')
             play_wp = p.get('about', {}).get('homeWinProbability')
             if play_wp is not None:
                 win_probs.append({'play_idx': idx + 1, 'home_wp': play_wp})
 
-    # Out-of-town scores setup
+    # Top Row: Scorebug (Left) and Win Probability (Right)
+    col_scorebug, col_win_prob = st.columns([1, 1])
+
+    with col_scorebug:
+        st.html(f'''
+            <div class="scorebug-container">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 1.25rem; font-weight: 900;">
+                        {away_name.upper()} <span style="color:{accent_yellow};">{away_runs}</span> &nbsp;@&nbsp; 
+                        {home_name.upper()} <span style="color:{accent_yellow};">{home_runs}</span>
+                    </div>
+                    <div style="font-size: 0.95rem; font-weight: 600; color: {subtext_color};">
+                        {inning_state} {inning_num} | {outs} Outs
+                    </div>
+                </div>
+                <div style="margin-top: 6px; font-size: 0.8rem; color: {text_color};">
+                    <strong>P:</strong> {pitcher_name} <span style="color:{accent_yellow};">({pitch_count})</span> &nbsp;|&nbsp; <strong>AB:</strong> {batter_name}
+                </div>
+            </div>
+        ''')
+
+    with col_win_prob:
+        if win_probs:
+            df_wp = pd.DataFrame(win_probs)
+            
+            plt.style.use('dark_background' if is_dark else 'default')
+            fig_wp, ax_wp = plt.subplots(figsize=(6, 1.3))
+            fig_wp.patch.set_facecolor(bg_color)
+            ax_wp.set_facecolor(bg_color)
+
+            ax_wp.plot(df_wp['play_idx'], df_wp['home_wp'], color='#00B4D8', linewidth=2)
+            ax_wp.axhline(50, color=card_border, linestyle='--', linewidth=1)
+
+            ax_wp.set_ylim(0, 100)
+            ax_wp.set_ylabel(f"{home_name[:3].upper()} Win %", fontsize=7, color=subtext_color)
+            ax_wp.tick_params(colors=subtext_color, labelsize=6)
+            
+            for spine in ax_wp.spines.values():
+                spine.set_color(card_border)
+
+            st.pyplot(fig_wp, use_container_width=True)
+            plt.close(fig_wp)
+        else:
+            st.info("Win probability timeline will plot as plays occur.")
+
+    # Middle Row: Out-of-Town Scoreboard (Full Width)
     oot_games = get_league_scoreboard()
     cards = []
     
     if oot_games:
         n_games = len(oot_games)
-        st.session_state.ticker_idx = (st.session_state.ticker_idx + 3) % n_games
-        selected_games = [oot_games[(st.session_state.ticker_idx + i) % n_games] for i in range(min(3, n_games))]
+        st.session_state.ticker_idx = (st.session_state.ticker_idx + 6) % n_games
+        selected_games = [oot_games[(st.session_state.ticker_idx + i) % n_games] for i in range(min(6, n_games))]
         
         for g in selected_games:
             away_id = g.get('away_id')
@@ -381,62 +427,14 @@ def render_brewers_dashboard(game_pk):
     else:
         ticker_cards_html = f'<div style="color: {subtext_color}; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
 
-    # Scorebug Header Section
-    col_scorebug, col_ticker = st.columns([1, 1])
-
-    with col_scorebug:
-        st.html(f'''
-            <div class="scorebug-container">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 1.25rem; font-weight: 900;">
-                        {away_name.upper()} <span style="color:{accent_yellow};">{away_runs}</span> &nbsp;@&nbsp; 
-                        {home_name.upper()} <span style="color:{accent_yellow};">{home_runs}</span>
-                    </div>
-                    <div style="font-size: 0.95rem; font-weight: 600; color: {subtext_color};">
-                        {inning_state} {inning_num} | {outs} Outs
-                    </div>
-                </div>
-                <div style="margin-top: 4px; font-size: 0.8rem; color: {text_color};">
-                    <strong>P:</strong> {pitcher_name} <span style="color:{accent_yellow};">({pitch_count})</span> &nbsp;|&nbsp; <strong>AB:</strong> {batter_name}
-                </div>
+    st.html(f'''
+        <div class="ticker-container">
+            <div class="ticker-header">OUT-OF-TOWN SCOREBOARD ↻ 15s</div>
+            <div class="ticker-games-grid">
+                {ticker_cards_html}
             </div>
-        ''')
-
-    with col_ticker:
-        st.html(f'''
-            <div class="ticker-container">
-                <div class="ticker-header">OUT-OF-TOWN SCOREBOARD ↻ 15s</div>
-                <div class="ticker-games-grid">
-                    {ticker_cards_html}
-                </div>
-            </div>
-        ''')
-
-    # --- WIN PROBABILITY GRAPH ---
-    st.markdown("**Live Win Probability**")
-    if win_probs:
-        df_wp = pd.DataFrame(win_probs)
-        
-        plt.style.use('dark_background' if is_dark else 'default')
-        fig_wp, ax_wp = plt.subplots(figsize=(12, 1.8))
-        fig_wp.patch.set_facecolor(bg_color)
-        ax_wp.set_facecolor(bg_color)
-
-        ax_wp.plot(df_wp['play_idx'], df_wp['home_wp'], color='#00B4D8', linewidth=2)
-        ax_wp.axhline(50, color=card_border, linestyle='--', linewidth=1)
-
-        ax_wp.set_ylim(0, 100)
-        ax_wp.set_ylabel(f"{home_name} Win %", fontsize=8, color=subtext_color)
-        ax_wp.set_xlabel("Plays", fontsize=8, color=subtext_color)
-        ax_wp.tick_params(colors=subtext_color, labelsize=7)
-        
-        for spine in ax_wp.spines.values():
-            spine.set_color(card_border)
-
-        st.pyplot(fig_wp, use_container_width=True)
-        plt.close(fig_wp)
-    else:
-        st.info("Win probability timeline will plot as plays occur.")
+        </div>
+    ''')
 
     # Process Plays Data for Field Plot & Statcast Metrics
     pitch_list = []
@@ -476,7 +474,7 @@ def render_brewers_dashboard(game_pk):
                     'y_feet': fy
                 })
 
-    # Lower Section: Field, Pitch Movement, Batted Ball Log
+    # Bottom Row: Field Plot, Pitch Movement, Batted Ball Log
     col_field, col_pitch, col_log = st.columns([2, 1, 1])
 
     with col_field:
