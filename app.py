@@ -83,12 +83,13 @@ st.markdown(f"""
         border: 1px solid {card_border};
         border-radius: 8px;
         padding: 24px 18px;
-        min-height: 145px;
+        height: 165px;
         display: flex;
         flex-direction: column;
         justify-content: center;
         gap: 6px;
         margin-bottom: 10px;
+        box-sizing: border-box;
     }}
 
     .ticker-container {{
@@ -101,7 +102,8 @@ st.markdown(f"""
         display: flex;
         flex-direction: column;
         justify-content: center;
-        min-height: 145px;
+        height: 165px;
+        box-sizing: border-box;
     }}
 
     .ticker-header {{
@@ -123,7 +125,7 @@ st.markdown(f"""
         background-color: {card_bg};
         border: 1px solid {card_border};
         border-radius: 5px;
-        padding: 16px 8px;
+        padding: 12px 6px;
         text-align: center;
         display: flex;
         flex-direction: column;
@@ -132,15 +134,15 @@ st.markdown(f"""
     }}
 
     .ticker-teams {{
-        font-size: 1rem;
+        font-size: 1.15rem;
         font-weight: 700;
         color: {text_color};
         line-height: 1.2;
     }}
 
     .ticker-status {{
-        font-size: 0.8rem;
-        font-weight: 500;
+        font-size: 0.9rem;
+        font-weight: 600;
         color: {subtext_color};
         margin-top: 6px;
     }}
