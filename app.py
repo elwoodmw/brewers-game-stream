@@ -105,11 +105,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
+st.html("""
     <div class="title-banner">
         <h1 class="main-title">Milwaukee Brewers Live Statcast Companion</h1>
     </div>
-""", unsafe_allow_html=True)
+""")
 
 BREWERS_TEAM_ID = 158
 
@@ -165,9 +165,8 @@ def convert_hc_to_field_feet(hc_x, hc_y):
     y_feet = (204 - hc_y) * 2.29
     return x_feet, y_feet
 
-# Helper to shorten inning/status strings for compact cards
 def format_compact_status(status_str):
-    if "Inning" in status_str or "Top" in status_str or "Bottom" in status_str or "Bot" in status_str or "Mid" in status_str or "End" in status_str:
+    if any(k in status_str for k in ["Inning", "Top", "Bottom", "Bot", "Mid", "End"]):
         return status_str.replace("Top ", "T").replace("Bottom ", "B").replace("Bot ", "B").replace("End ", "E").replace("Mid ", "M")
     elif "Final" in status_str:
         return "FINAL"
@@ -302,15 +301,13 @@ def render_brewers_dashboard(game_pk):
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
 
-    # Out-of-town scores setup: select 3 games at a time
+    # Out-of-town scores setup
     oot_games = get_league_scoreboard()
-    ticker_cards_html = ""
+    cards = []
     
     if oot_games:
         n_games = len(oot_games)
         st.session_state.ticker_idx = (st.session_state.ticker_idx + 3) % n_games
-        
-        # Pick 3 consecutive games
         selected_games = [oot_games[(st.session_state.ticker_idx + i) % n_games] for i in range(min(3, n_games))]
         
         for g in selected_games:
@@ -320,20 +317,21 @@ def render_brewers_dashboard(game_pk):
             h_score = g.get('home_score', 0)
             status = format_compact_status(g.get('status', 'PRE'))
             
-            ticker_cards_html += f"""
+            cards.append(f'''
                 <div class="ticker-card">
                     <div class="ticker-teams">{away_abbrev} <span style="color:#FFD166;">{a_score}</span> @ <span style="color:#FFD166;">{h_score}</span> {home_abbrev}</div>
                     <div class="ticker-status">{status}</div>
                 </div>
-            """
+            ''')
+        ticker_cards_html = "".join(cards)
     else:
-        ticker_cards_html = """<div style="color: #94A3B8; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>"""
+        ticker_cards_html = '<div style="color: #94A3B8; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
 
-    # 50/50 Split Header
+    # 50/50 Header Section using st.html
     col_scorebug, col_ticker = st.columns([1, 1])
 
     with col_scorebug:
-        st.markdown(f"""
+        st.html(f'''
             <div class="scorebug-container">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="font-size: 1.25rem; font-weight: 900;">
@@ -348,17 +346,17 @@ def render_brewers_dashboard(game_pk):
                     <strong>P:</strong> {pitcher_name} &nbsp;|&nbsp; <strong>AB:</strong> {batter_name}
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+        ''')
 
     with col_ticker:
-        st.markdown(f"""
+        st.html(f'''
             <div class="ticker-container">
                 <div class="ticker-header">OUT-OF-TOWN SCOREBOARD ↻ 15s</div>
                 <div class="ticker-games-grid">
                     {ticker_cards_html}
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+        ''')
 
     # Process Plays Data
     pitch_list = []
@@ -398,7 +396,7 @@ def render_brewers_dashboard(game_pk):
                     'y_feet': fy
                 })
 
-    # Side-By-Side Layout (50% Spray Chart, 25% Pitch Telemetry, 25% Batted Ball Log)
+    # Side-By-Side Layout
     col_field, col_pitch, col_log = st.columns([2, 1, 1])
 
     with col_field:
