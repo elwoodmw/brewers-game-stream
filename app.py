@@ -105,11 +105,11 @@ st.markdown(f"""
     }}
 
     .ticker-header {{
-        font-size: 0.7rem;
+        font-size: 0.85rem;
         font-weight: 700;
         color: #00B4D8;
         letter-spacing: 0.05em;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
     }}
 
     .ticker-games-grid {{
@@ -123,7 +123,7 @@ st.markdown(f"""
         background-color: {card_bg};
         border: 1px solid {card_border};
         border-radius: 5px;
-        padding: 18px 8px;
+        padding: 16px 8px;
         text-align: center;
         display: flex;
         flex-direction: column;
@@ -132,14 +132,14 @@ st.markdown(f"""
     }}
 
     .ticker-teams {{
-        font-size: 0.85rem;
+        font-size: 1rem;
         font-weight: 700;
         color: {text_color};
         line-height: 1.2;
     }}
 
     .ticker-status {{
-        font-size: 0.7rem;
+        font-size: 0.8rem;
         font-weight: 500;
         color: {subtext_color};
         margin-top: 6px;
