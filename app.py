@@ -91,7 +91,6 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
-    /* Slightly taller vertical padding on ticker container */
     .ticker-container {{
         background-color: {ticker_bg};
         border: 1px solid {card_border};
@@ -119,7 +118,6 @@ st.markdown(f"""
         align-items: center;
     }}
 
-    /* Taller vertical padding and adjusted font sizes on individual game cards */
     .ticker-card {{
         background-color: {card_bg};
         border: 1px solid {card_border};
@@ -338,6 +336,7 @@ def render_brewers_dashboard(game_pk):
     live_data = feed['liveData']
     linescore = live_data.get('linescore', {})
     plays = live_data.get('plays', {}).get('allPlays', [])
+    players_dict = game_data.get('players', {})
 
     teams = game_data.get('teams', {})
     away_name = teams.get('away', {}).get('clubName', 'AWAY')
@@ -356,6 +355,13 @@ def render_brewers_dashboard(game_pk):
     
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
+
+    # Extract On Deck and In Hole batters
+    on_deck_id = offense.get('onDeck', {}).get('id')
+    in_hole_id = offense.get('inHole', {}).get('id')
+
+    on_deck_name = players_dict.get(f"ID{on_deck_id}", {}).get('fullName', 'N/A') if on_deck_id else 'N/A'
+    in_hole_name = players_dict.get(f"ID{in_hole_id}", {}).get('fullName', 'N/A') if in_hole_id else 'N/A'
 
     pitch_count = 0
     win_probs = []
@@ -452,7 +458,12 @@ def render_brewers_dashboard(game_pk):
                     </div>
                 </div>
                 <div style="margin-top: 6px; font-size: 0.8rem; color: {text_color};">
-                    <strong>P:</strong> {pitcher_name} <span style="color:{accent_yellow};">({pitch_count})</span> &nbsp;|&nbsp; <strong>AB:</strong> {batter_name}
+                    <strong>P:</strong> {pitcher_name} <span style="color:{accent_yellow};">({pitch_count})</span> &nbsp;|&nbsp; 
+                    <strong>AB:</strong> {batter_name}
+                </div>
+                <div style="margin-top: 4px; font-size: 0.72rem; color: {subtext_color};">
+                    <strong>On Deck:</strong> {on_deck_name} &nbsp;|&nbsp; 
+                    <strong>In Hole:</strong> {in_hole_name}
                 </div>
             </div>
         ''')
