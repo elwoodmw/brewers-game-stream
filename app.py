@@ -11,16 +11,32 @@ import statsapi
 # 1. Page Configuration
 st.set_page_config(page_title="Milwaukee Brewers Live Companion", layout="wide")
 
-# Initialize Session State for Theme Toggle
+# Initialize Session State for Theme and Font Selection
 if 'is_dark' not in st.session_state:
     st.session_state.is_dark = True
 
-# Callback to handle dark mode toggle cleanly in a single click
+if 'selected_font' not in st.session_state:
+    st.session_state.selected_font = "Inter"
+
+# Callback for Dark Mode Toggle
 def toggle_dark_mode():
     st.session_state.is_dark = st.session_state.dark_mode_toggle
 
-# Top Header Layout with Top-Right Theme Toggle
-col_header, col_toggle = st.columns([5, 1])
+# Callback for Font Selector
+def update_font():
+    st.session_state.selected_font = st.session_state.font_choice
+
+# Top Header Layout with Font Selector & Theme Toggle
+col_header, col_font, col_toggle = st.columns([3, 1.5, 1])
+
+with col_font:
+    st.selectbox(
+        "Font Style",
+        options=["Inter", "Roboto", "Space Grotesk", "Montserrat", "Fira Code"],
+        index=["Inter", "Roboto", "Space Grotesk", "Montserrat", "Fira Code"].index(st.session_state.selected_font),
+        key="font_choice",
+        on_change=update_font
+    )
 
 with col_toggle:
     st.toggle(
@@ -31,8 +47,9 @@ with col_toggle:
     )
 
 is_dark = st.session_state.is_dark
+current_font = st.session_state.selected_font
 
-# CSS Variables Based on Selected Theme
+# CSS Variables Based on Selected Theme and Font
 bg_color = "#121212" if is_dark else "#F8FAFC"
 card_bg = "#1E293B" if is_dark else "#FFFFFF"
 card_border = "#334155" if is_dark else "#E2E8F0"
@@ -43,15 +60,15 @@ ticker_bg = "#0F172A" if is_dark else "#F1F5F9"
 
 st.markdown(f"""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Inter:wght@400;600;800;900&family=Montserrat:wght@400;600;800;900&family=Roboto:wght@400;500;700;900&family=Space+Grotesk:wght@400;600;700&display=swap');
     
     html, body, [data-testid="stAppViewContainer"] {{
         background-color: {bg_color} !important;
-        font-family: 'Inter', sans-serif !important;
+        font-family: '{current_font}', sans-serif !important;
     }}
     
     h1, h2, h3, h4, p, span, label, div {{
-        font-family: 'Inter', sans-serif !important;
+        font-family: '{current_font}', sans-serif !important;
         color: {text_color} !important;
     }}
     
@@ -343,7 +360,6 @@ def render_brewers_dashboard(game_pk):
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
 
-    # Pitch Count & Win Probability tracking
     pitch_count = 0
     win_probs = []
     pitch_list = []
@@ -395,7 +411,6 @@ def render_brewers_dashboard(game_pk):
                         'y_feet': fy
                     })
 
-    # Out-of-town scores setup
     oot_games = get_league_scoreboard()
     cards = []
     
@@ -425,11 +440,10 @@ def render_brewers_dashboard(game_pk):
     else:
         ticker_cards_html = f'<div style="color: {subtext_color}; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
 
-    # MAIN TWO-COLUMN SPLIT
-    col_left, col_right = st.columns([5, 7])
+    # EQUAL 50/50 TWO-COLUMN SPLIT
+    col_left, col_right = st.columns([1, 1])
 
     with col_left:
-        # Live Scorebug placed back on top left above the field
         st.html(f'''
             <div class="scorebug-container">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -447,7 +461,6 @@ def render_brewers_dashboard(game_pk):
             </div>
         ''')
 
-        # Stadium Field Plot directly under Scorebug
         runners = {
             '1b': 'first' in offense,
             '2b': 'second' in offense,
@@ -458,7 +471,6 @@ def render_brewers_dashboard(game_pk):
         plt.close(fig_field)
 
     with col_right:
-        # Win Probability Section Stacked First
         st.markdown("**Live Win Probability**")
         if win_probs:
             df_wp = pd.DataFrame(win_probs)
@@ -483,7 +495,6 @@ def render_brewers_dashboard(game_pk):
         else:
             st.info("Win probability timeline will plot as plays occur.")
 
-        # Out-of-Town Scoreboard Stacked Second
         st.html(f'''
             <div class="ticker-container">
                 <div class="ticker-header">OUT-OF-TOWN SCOREBOARD ↻ 15s</div>
@@ -493,7 +504,6 @@ def render_brewers_dashboard(game_pk):
             </div>
         ''')
 
-        # Pitch Telemetry & Batted Ball Log Stacked Third
         col_pitch, col_log = st.columns([1, 1])
 
         with col_pitch:
