@@ -331,16 +331,25 @@ def render_brewers_dashboard(game_pk):
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
 
-    # Calculate Total Pitch Count Only for Current Pitcher
+    # Pitch Count calculation
     pitch_count = 0
+    win_probs = []
+
     if plays:
         pitcher_id = defense.get('pitcher', {}).get('id')
-        for p in plays:
+        for idx, p in enumerate(plays):
+            # Track pitch count
             if p.get('matchup', {}).get('pitcher', {}).get('id') == pitcher_id:
                 p_events = p.get('playEvents', [])
                 for e in p_events:
                     if e.get('isPitch'):
                         pitch_count += 1
+            
+            # Track Win Probability
+            p_end = p.get('playEndTime')
+            play_wp = p.get('about', {}).get('homeWinProbability')
+            if play_wp is not None:
+                win_probs.append({'play_idx': idx + 1, 'home_wp': play_wp})
 
     # Out-of-town scores setup
     oot_games = get_league_scoreboard()
@@ -372,7 +381,7 @@ def render_brewers_dashboard(game_pk):
     else:
         ticker_cards_html = f'<div style="color: {subtext_color}; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
 
-    # Scorebug Header Section with Clean Pitch Count
+    # Scorebug Header Section
     col_scorebug, col_ticker = st.columns([1, 1])
 
     with col_scorebug:
@@ -403,7 +412,33 @@ def render_brewers_dashboard(game_pk):
             </div>
         ''')
 
-    # Process Plays Data
+    # --- WIN PROBABILITY GRAPH ---
+    st.markdown("**Live Win Probability**")
+    if win_probs:
+        df_wp = pd.DataFrame(win_probs)
+        
+        plt.style.use('dark_background' if is_dark else 'default')
+        fig_wp, ax_wp = plt.subplots(figsize=(12, 1.8))
+        fig_wp.patch.set_facecolor(bg_color)
+        ax_wp.set_facecolor(bg_color)
+
+        ax_wp.plot(df_wp['play_idx'], df_wp['home_wp'], color='#00B4D8', linewidth=2)
+        ax_wp.axhline(50, color=card_border, linestyle='--', linewidth=1)
+
+        ax_wp.set_ylim(0, 100)
+        ax_wp.set_ylabel(f"{home_name} Win %", fontsize=8, color=subtext_color)
+        ax_wp.set_xlabel("Plays", fontsize=8, color=subtext_color)
+        ax_wp.tick_params(colors=subtext_color, labelsize=7)
+        
+        for spine in ax_wp.spines.values():
+            spine.set_color(card_border)
+
+        st.pyplot(fig_wp, use_container_width=True)
+        plt.close(fig_wp)
+    else:
+        st.info("Win probability timeline will plot as plays occur.")
+
+    # Process Plays Data for Field Plot & Statcast Metrics
     pitch_list = []
     batted_balls = []
 
@@ -441,7 +476,7 @@ def render_brewers_dashboard(game_pk):
                     'y_feet': fy
                 })
 
-    # Side-By-Side Layout
+    # Lower Section: Field, Pitch Movement, Batted Ball Log
     col_field, col_pitch, col_log = st.columns([2, 1, 1])
 
     with col_field:
