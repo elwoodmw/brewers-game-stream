@@ -159,13 +159,12 @@ st.markdown(f"""
     }}
 
     .custom-table {{
-        width: 100%;
+        min-width: 100%;
         border-collapse: collapse;
         font-family: 'Fira Code', monospace;
         font-size: 0.78rem;
         white-space: nowrap;
-        table-layout: fixed;
-    }}
+    }]
 
     .custom-table th, .custom-table td {{
         padding: 0 10px;
