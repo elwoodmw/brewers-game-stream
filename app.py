@@ -311,7 +311,7 @@ def render_brewers_dashboard(game_pk):
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
 
-    # Out-of-town scores setup
+    # Out-of-town scores setup: Team Abbreviation followed by Score
     oot_games = get_league_scoreboard()
     cards = []
     
@@ -333,7 +333,7 @@ def render_brewers_dashboard(game_pk):
             
             cards.append(f'''
                 <div class="ticker-card">
-                    <div class="ticker-teams">{away_abbrev} <span style="color:#FFD166;">{a_score}</span> @ <span style="color:#FFD166;">{h_score}</span> {home_abbrev}</div>
+                    <div class="ticker-teams">{away_abbrev} <span style="color:#FFD166;">{a_score}</span> @ {home_abbrev} <span style="color:#FFD166;">{h_score}</span></div>
                     <div class="ticker-status">{status}</div>
                 </div>
             ''')
@@ -341,7 +341,7 @@ def render_brewers_dashboard(game_pk):
     else:
         ticker_cards_html = '<div style="color: #94A3B8; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
 
-    # 50/50 Header Section
+    # 50/50 Header Section: Team Name followed by Score
     col_scorebug, col_ticker = st.columns([1, 1])
 
     with col_scorebug:
@@ -350,7 +350,7 @@ def render_brewers_dashboard(game_pk):
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="font-size: 1.25rem; font-weight: 900;">
                         {away_name.upper()} <span style="color:#FFD166;">{away_runs}</span> &nbsp;@&nbsp; 
-                        <span style="color:#FFD166;">{home_runs}</span> {home_name.upper()}
+                        {home_name.upper()} <span style="color:#FFD166;">{home_runs}</span>
                     </div>
                     <div style="font-size: 0.95rem; font-weight: 600; color: #94A3B8;">
                         {inning_state} {inning_num} | {outs} Outs
