@@ -405,7 +405,6 @@ def render_brewers_dashboard(game_pk):
         if current_play:
             p_events = current_play.get('playEvents', [])
             pitch_events_list = [e for e in p_events if e.get('isPitch')]
-            # Take last 12 pitches if more than 12
             recent_pitch_events = pitch_events_list[-12:]
             
             p_num = max(1, len(pitch_events_list) - len(recent_pitch_events) + 1)
@@ -574,7 +573,7 @@ def render_brewers_dashboard(game_pk):
                         "Pitch": st.column_config.TextColumn("Pitch", width="small"),
                         "Velo": st.column_config.TextColumn("Velo", width="small"),
                         "Spin": st.column_config.TextColumn("Spin", width="small"),
-                        "Result": st.column_config.TextColumn("Result", width="large")
+                        "Result": st.column_config.TextColumn("Result", width="medium")
                     }
                 )
             else:
