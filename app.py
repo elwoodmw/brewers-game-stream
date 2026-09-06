@@ -8,104 +8,122 @@ import seaborn as sns
 import streamlit as st
 import statsapi
 
-# 1. Page Configuration & Dark Theme Styling
+# 1. Page Configuration
 st.set_page_config(page_title="Milwaukee Brewers Live Companion", layout="wide")
 
-st.markdown("""
+# Theme Selection
+theme = st.sidebar.radio("Theme Mode", ["Dark", "Light"], index=0, horizontal=True)
+is_dark = theme == "Dark"
+
+# CSS Variables Based on Theme
+bg_color = "#121212" if is_dark else "#F8FAFC"
+card_bg = "#1E293B" if is_dark else "#FFFFFF"
+card_border = "#334155" if is_dark else "#E2E8F0"
+text_color = "#FFFFFF" if is_dark else "#0F172A"
+subtext_color = "#94A3B8" if is_dark else "#64748B"
+accent_yellow = "#FFD166" if is_dark else "#D97706"
+ticker_bg = "#0F172A" if is_dark else "#F1F5F9"
+
+st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
     
-    html, body, [data-testid="stAppViewContainer"] {
-        background-color: #121212 !important;
+    html, body, [data-testid="stAppViewContainer"] {{
+        background-color: {bg_color} !important;
         font-family: 'Inter', sans-serif !important;
-    }
+    }}
     
-    h1, h2, h3, h4, p, span, label, div {
+    h1, h2, h3, h4, p, span, label, div {{
         font-family: 'Inter', sans-serif !important;
-        color: #FFFFFF !important;
-    }
+        color: {text_color} !important;
+    }}
     
-    .title-banner {
+    .title-banner {{
         padding: 0.2rem 0rem;
-        border-bottom: 1px solid #2D2D2D;
+        border-bottom: 1px solid {card_border};
         margin-top: -1.0rem !important;
         margin-bottom: 1.0rem;
-    }
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }}
     
-    .main-title {
+    .main-title {{
         font-size: 1.8rem !important;
         font-weight: 900 !important;
         letter-spacing: -0.05em !important;
-        color: #FFFFFF !important;
+        color: {text_color} !important;
         margin-bottom: 0px !important;
-    }
+    }}
     
-    .scorebug-container {
-        background-color: #1E293B;
-        border: 1px solid #334155;
+    .scorebug-container {{
+        background-color: {card_bg};
+        border: 1px solid {card_border};
         border-radius: 8px;
         padding: 10px 16px;
         height: 90px;
         display: flex;
         flex-direction: column;
         justify-content: center;
-    }
+    }}
 
-    .ticker-container {
-        background-color: #0F172A;
-        border: 1px solid #1E293B;
+    .ticker-container {{
+        background-color: {ticker_bg};
+        border: 1px solid {card_border};
         border-radius: 8px;
         padding: 8px 14px;
         height: 90px;
         display: flex;
         flex-direction: column;
         justify-content: center;
-    }
+    }}
 
-    .ticker-header {
+    .ticker-header {{
         font-size: 0.7rem;
         font-weight: 800;
         color: #00B4D8;
         letter-spacing: 0.05em;
         margin-bottom: 4px;
-    }
+    }}
 
-    .ticker-games-grid {
+    .ticker-games-grid {{
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
         gap: 8px;
         align-items: center;
-    }
+    }}
 
-    .ticker-card {
-        background-color: #1E293B;
-        border: 1px solid #334155;
+    .ticker-card {{
+        background-color: {card_bg};
+        border: 1px solid {card_border};
         border-radius: 5px;
         padding: 4px 8px;
         text-align: center;
-    }
+    }}
 
-    .ticker-teams {
+    .ticker-teams {{
         font-size: 0.85rem;
         font-weight: 800;
-        color: #FFFFFF;
-    }
+        color: {text_color};
+    }}
 
-    .ticker-status {
+    .ticker-status {{
         font-size: 0.7rem;
         font-weight: 600;
-        color: #94A3B8;
+        color: {subtext_color};
         margin-top: 1px;
-    }
+    }}
     
-    [data-testid="stSidebar"] {visibility: hidden; width: 0px; display: none;}
-    [data-testid="stHeader"] {visibility: hidden;}
-    footer {visibility: hidden;}
-    .block-container {padding-top: 0rem !important;}
+    [data-testid="stSidebar"] {{
+        background-color: {card_bg} !important;
+    }}
+    [data-testid="stHeader"] {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
+    .block-container {{padding-top: 1rem !important;}}
     </style>
 """, unsafe_allow_html=True)
 
-st.html("""
+st.html(f"""
     <div class="title-banner">
         <h1 class="main-title">Milwaukee Brewers Live Statcast Companion</h1>
     </div>
@@ -113,7 +131,6 @@ st.html("""
 
 BREWERS_TEAM_ID = 158
 
-# Official MLB Team ID to Standard 3-Letter Abbreviation Mapping
 TEAM_ABBREVS = {
     108: "LAA", 109: "ARI", 110: "BAL", 111: "BOS", 112: "CHC",
     113: "CIN", 114: "CLE", 115: "COL", 116: "DET", 117: "HOU",
@@ -123,7 +140,6 @@ TEAM_ABBREVS = {
     144: "ATL", 145: "CWS", 146: "MIA", 147: "NYY", 158: "MIL"
 }
 
-# Stadium dimensions lookup
 STADIUM_DIMENSIONS = {
     'Great American Ball Park': {'lf': 328, 'lcf': 379, 'cf': 404, 'rcf': 370, 'rf': 325},
     'American Family Field': {'lf': 344, 'lcf': 371, 'cf': 400, 'rcf': 374, 'rf': 345},
@@ -134,7 +150,6 @@ DEFAULT_DIMS = {'lf': 330, 'lcf': 375, 'cf': 400, 'rcf': 375, 'rf': 330}
 # 2. Data Fetching Utilities
 @st.cache_data(ttl=60)
 def get_today_brewers_game():
-    """Fetch today's Brewers game_pk and summary."""
     today_str = datetime.date.today().strftime('%Y-%m-%d')
     try:
         schedule = statsapi.schedule(date=today_str, team=BREWERS_TEAM_ID)
@@ -147,7 +162,6 @@ def get_today_brewers_game():
 
 @st.cache_data(ttl=120)
 def get_league_scoreboard():
-    """Fetch all non-Brewers MLB games scheduled for today."""
     today_str = datetime.date.today().strftime('%Y-%m-%d')
     try:
         schedule = statsapi.schedule(date=today_str)
@@ -160,7 +174,6 @@ def get_league_scoreboard():
         return []
 
 def fetch_live_game_feed(game_pk):
-    """Fetch raw live feed JSON from MLB API."""
     url = f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
     resp = requests.get(url)
     if resp.status_code == 200:
@@ -168,7 +181,6 @@ def fetch_live_game_feed(game_pk):
     return None
 
 def convert_hc_to_field_feet(hc_x, hc_y):
-    """Transforms Gameday hit coordinates to feet relative to Home Plate (0,0)."""
     if hc_x is None or hc_y is None:
         return None, None
     x_feet = (hc_x - 126) * 2.29
@@ -187,10 +199,14 @@ def format_compact_status(status_str):
     return status_str[:6].upper()
 
 # 3. Field Plotting
-def draw_full_baseball_field(batted_balls, runners, field_title_label):
+def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
     fig, ax = plt.subplots(figsize=(6, 6))
-    fig.patch.set_facecolor('#121212')
-    ax.set_facecolor('#121212')
+    bg_c = '#121212' if is_dark else '#F8FAFC'
+    border_c = '#1E293B' if is_dark else '#CBD5E1'
+    line_c = '#475569' if is_dark else '#94A3B8'
+    
+    fig.patch.set_facecolor(bg_c)
+    ax.set_facecolor(bg_c)
 
     venue_key = next((k for k in STADIUM_DIMENSIONS if k.lower() in field_title_label.lower()), None)
     dims = STADIUM_DIMENSIONS.get(venue_key, DEFAULT_DIMS)
@@ -212,17 +228,17 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label):
 
     ax.plot([0, wall_x[0]], [0, wall_y[0]], color='#64748B', linewidth=1.5)
     ax.plot([0, wall_x[-1]], [0, wall_y[-1]], color='#64748B', linewidth=1.5)
-    ax.plot(wall_x, wall_y, color='#1E293B', linewidth=4)
+    ax.plot(wall_x, wall_y, color=border_c, linewidth=4)
     ax.plot(wall_x, wall_y, color='#00B4D8', linewidth=1.5, linestyle='--')
 
-    dirt_arc = patches.Arc((0, 60.5), 190, 190, angle=0, theta1=20, theta2=160, color='#1E293B', linewidth=1.5)
+    dirt_arc = patches.Arc((0, 60.5), 190, 190, angle=0, theta1=20, theta2=160, color=border_c, linewidth=1.5)
     ax.add_patch(dirt_arc)
 
     infield_x = [0, 63.6, 0, -63.6, 0]
     infield_y = [0, 63.6, 127.3, 63.6, 0]
-    ax.plot(infield_x, infield_y, color='#475569', linewidth=1.8)
+    ax.plot(infield_x, infield_y, color=line_c, linewidth=1.8)
 
-    mound = patches.Circle((0, 60.5), radius=9, facecolor='#1E293B', edgecolor='#475569', linewidth=1)
+    mound = patches.Circle((0, 60.5), radius=9, facecolor=border_c, edgecolor=line_c, linewidth=1)
     rubber = patches.Rectangle((-1.5, 60), 3, 1, facecolor='#FFFFFF', edgecolor='#FFFFFF')
     ax.add_patch(mound)
     ax.add_patch(rubber)
@@ -230,7 +246,7 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label):
     bases_coords = {'1b': (63.6, 63.6), '2b': (0, 127.3), '3b': (-63.6, 63.6)}
     for base, (bx, by) in bases_coords.items():
         is_occ = runners.get(base, False)
-        fc = '#FFD166' if is_occ else '#1E293B'
+        fc = '#FFD166' if is_occ else border_c
         ec = '#FFD166' if is_occ else '#94A3B8'
         sq = patches.Rectangle((bx - 4.5, by - 4.5), 9, 9, angle=45, rotation_point='center', facecolor=fc, edgecolor=ec, zorder=5)
         ax.add_patch(sq)
@@ -255,7 +271,7 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label):
     ax.set_xlim(-260, 260)
     ax.set_ylim(-20, 430)
     ax.axis('off')
-    ax.set_title(field_title_label, fontsize=9, fontweight='bold', color='#8E9AAF', pad=10)
+    ax.set_title(field_title_label, fontsize=9, fontweight='bold', color=subtext_color, pad=10)
     return fig
 
 # 4. Main Application
@@ -311,7 +327,28 @@ def render_brewers_dashboard(game_pk):
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
 
-    # Out-of-town scores setup: Team Abbreviation followed by Score
+    # Calculate Current Pitch Count Telemetry
+    pitch_count_str = "0 | 0S - 0B"
+    if plays:
+        current_play = plays[-1]
+        pitcher_id = defense.get('pitcher', {}).get('id')
+        
+        pitches, strikes, balls = 0, 0, 0
+        for p in plays:
+            p_events = p.get('playEvents', [])
+            for e in p_events:
+                if e.get('isPitch'):
+                    # Match current pitcher
+                    if p.get('matchup', {}).get('pitcher', {}).get('id') == pitcher_id:
+                        pitches += 1
+                        details = e.get('details', {})
+                        if details.get('isStrike') or details.get('isOut') or details.get('hasReview'):
+                            strikes += 1
+                        else:
+                            balls += 1
+        pitch_count_str = f"{pitches} | {strikes}S - {balls}B"
+
+    # Out-of-town scores setup
     oot_games = get_league_scoreboard()
     cards = []
     
@@ -333,15 +370,15 @@ def render_brewers_dashboard(game_pk):
             
             cards.append(f'''
                 <div class="ticker-card">
-                    <div class="ticker-teams">{away_abbrev} <span style="color:#FFD166;">{a_score}</span> @ {home_abbrev} <span style="color:#FFD166;">{h_score}</span></div>
+                    <div class="ticker-teams">{away_abbrev} <span style="color:{accent_yellow};">{a_score}</span> @ {home_abbrev} <span style="color:{accent_yellow};">{h_score}</span></div>
                     <div class="ticker-status">{status}</div>
                 </div>
             ''')
         ticker_cards_html = "".join(cards)
     else:
-        ticker_cards_html = '<div style="color: #94A3B8; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
+        ticker_cards_html = f'<div style="color: {subtext_color}; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
 
-    # 50/50 Header Section: Team Name followed by Score
+    # Scorebug Header Section with Pitch Count
     col_scorebug, col_ticker = st.columns([1, 1])
 
     with col_scorebug:
@@ -349,15 +386,15 @@ def render_brewers_dashboard(game_pk):
             <div class="scorebug-container">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="font-size: 1.25rem; font-weight: 900;">
-                        {away_name.upper()} <span style="color:#FFD166;">{away_runs}</span> &nbsp;@&nbsp; 
-                        {home_name.upper()} <span style="color:#FFD166;">{home_runs}</span>
+                        {away_name.upper()} <span style="color:{accent_yellow};">{away_runs}</span> &nbsp;@&nbsp; 
+                        {home_name.upper()} <span style="color:{accent_yellow};">{home_runs}</span>
                     </div>
-                    <div style="font-size: 0.95rem; font-weight: 600; color: #94A3B8;">
+                    <div style="font-size: 0.95rem; font-weight: 600; color: {subtext_color};">
                         {inning_state} {inning_num} | {outs} Outs
                     </div>
                 </div>
-                <div style="margin-top: 4px; font-size: 0.8rem; color: #CBD5E1;">
-                    <strong>P:</strong> {pitcher_name} &nbsp;|&nbsp; <strong>AB:</strong> {batter_name}
+                <div style="margin-top: 4px; font-size: 0.8rem; color: {text_color};">
+                    <strong>P:</strong> {pitcher_name} <span style="color:{accent_yellow};">({pitch_count_str})</span> &nbsp;|&nbsp; <strong>AB:</strong> {batter_name}
                 </div>
             </div>
         ''')
@@ -419,7 +456,7 @@ def render_brewers_dashboard(game_pk):
             '2b': 'second' in offense,
             '3b': 'third' in offense
         }
-        fig_field = draw_full_baseball_field(batted_balls, runners, field_title_label)
+        fig_field = draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark)
         st.pyplot(fig_field, use_container_width=True)
         plt.close(fig_field)
 
@@ -429,10 +466,10 @@ def render_brewers_dashboard(game_pk):
             df_pitches = pd.DataFrame(pitch_list)
             latest_p = df_pitches.iloc[-1]
 
-            plt.style.use('dark_background')
+            plt.style.use('dark_background' if is_dark else 'default')
             fig, ax = plt.subplots(figsize=(4, 4.5))
-            fig.patch.set_facecolor('#121212')
-            ax.set_facecolor('#121212')
+            fig.patch.set_facecolor(bg_color)
+            ax.set_facecolor(bg_color)
 
             sns.scatterplot(
                 data=df_pitches, x='horiz_break_in', y='vert_break_in',
@@ -441,20 +478,20 @@ def render_brewers_dashboard(game_pk):
 
             ax.scatter(
                 latest_p['horiz_break_in'], latest_p['vert_break_in'],
-                color='#FFFFFF', s=120, edgecolor='#00B4D8', linewidth=2.0, label='LATEST', zorder=5
+                color='#FFFFFF' if is_dark else '#000000', s=120, edgecolor='#00B4D8', linewidth=2.0, label='LATEST', zorder=5
             )
 
-            ax.axhline(0, color='#2D2D2D', linewidth=1.2)
-            ax.axvline(0, color='#2D2D2D', linewidth=1.2)
+            ax.axhline(0, color=card_border, linewidth=1.2)
+            ax.axvline(0, color=card_border, linewidth=1.2)
             ax.set_xlim(25, -25)
             ax.set_ylim(-25, 25)
-            ax.set_xlabel("← Glove | Arm →", fontsize=7, color='#8E9AAF')
-            ax.set_ylabel("IVB (in)", fontsize=7, color='#8E9AAF')
+            ax.set_xlabel("← Glove | Arm →", fontsize=7, color=subtext_color)
+            ax.set_ylabel("IVB (in)", fontsize=7, color=subtext_color)
 
             legend = ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False, fontsize=6)
             if legend:
                 for t in legend.get_texts():
-                    t.set_color('#FFFFFF')
+                    t.set_color(text_color)
 
             st.pyplot(fig, use_container_width=True)
             plt.close(fig)
