@@ -91,11 +91,12 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
+    /* Slightly taller vertical padding on ticker container */
     .ticker-container {{
         background-color: {ticker_bg};
         border: 1px solid {card_border};
         border-radius: 8px;
-        padding: 8px 14px;
+        padding: 12px 14px;
         margin-top: 10px;
         margin-bottom: 10px;
         display: flex;
@@ -108,7 +109,7 @@ st.markdown(f"""
         font-weight: 700;
         color: #00B4D8;
         letter-spacing: 0.05em;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
     }}
 
     .ticker-games-grid {{
@@ -118,25 +119,27 @@ st.markdown(f"""
         align-items: center;
     }}
 
+    /* Taller vertical padding and adjusted font sizes on individual game cards */
     .ticker-card {{
         background-color: {card_bg};
         border: 1px solid {card_border};
         border-radius: 5px;
-        padding: 4px 8px;
+        padding: 8px 8px;
         text-align: center;
     }}
 
     .ticker-teams {{
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         font-weight: 700;
         color: {text_color};
+        line-height: 1.2;
     }}
 
     .ticker-status {{
-        font-size: 0.65rem;
+        font-size: 0.7rem;
         font-weight: 500;
         color: {subtext_color};
-        margin-top: 1px;
+        margin-top: 3px;
     }}
     
     [data-testid="stSidebar"] {{display: none;}}
@@ -434,7 +437,6 @@ def render_brewers_dashboard(game_pk):
     else:
         ticker_cards_html = f'<div style="color: {subtext_color}; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
 
-    # EQUAL 50/50 TWO-COLUMN SPLIT
     col_left, col_right = st.columns([1, 1])
 
     with col_left:
