@@ -582,7 +582,7 @@ def render_brewers_dashboard(game_pk):
                     df_pitches, 
                     use_container_width=True, 
                     hide_index=True, 
-                    height=500,
+                    height=240,
                     column_config={
                         "#": st.column_config.NumberColumn("#", width=35),
                         "Pitch": st.column_config.TextColumn("Pitch", width=45),
@@ -602,9 +602,9 @@ def render_brewers_dashboard(game_pk):
                     df_batted,
                     use_container_width=True,
                     hide_index=True,
-                    height=500,
+                    height=240,
                     column_config={
-                        "Batter": st.column_config.TextColumn("Batter", width="medium"),
+                        "Batter": st.column_config.TextColumn("Batter", width=110),
                         "Result": st.column_config.TextColumn("Result", width="medium"),
                         "EV (mph)": st.column_config.TextColumn("EV (mph)", width="small"),
                         "LA (°)": st.column_config.TextColumn("LA (°)", width="small"),
