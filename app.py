@@ -206,7 +206,7 @@ def format_compact_status(status_str):
 
 # 3. Field Plotting
 def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
-    fig, ax = plt.subplots(figsize=(7, 8))
+    fig, ax = plt.subplots(figsize=(7, 7.5))
     bg_c = '#121212' if is_dark else '#F8FAFC'
     border_c = '#1E293B' if is_dark else '#CBD5E1'
     line_c = '#475569' if is_dark else '#94A3B8'
@@ -417,21 +417,11 @@ def render_brewers_dashboard(game_pk):
     else:
         ticker_cards_html = f'<div style="color: {subtext_color}; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
 
-    # MAIN LAYOUT: Field on Left (5), Data Flow on Right (7)
+    # MAIN TWO-COLUMN SPLIT
     col_left, col_right = st.columns([5, 7])
 
     with col_left:
-        runners = {
-            '1b': 'first' in offense,
-            '2b': 'second' in offense,
-            '3b': 'third' in offense
-        }
-        fig_field = draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark)
-        st.pyplot(fig_field, use_container_width=True)
-        plt.close(fig_field)
-
-    with col_right:
-        # Scorebug Header
+        # Live Scorebug placed back on the left top above the field
         st.html(f'''
             <div class="scorebug-container">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -449,7 +439,18 @@ def render_brewers_dashboard(game_pk):
             </div>
         ''')
 
-        # Win Probability Section
+        # Stadium Field Plot directly under Scorebug
+        runners = {
+            '1b': 'first' in offense,
+            '2b': 'second' in offense,
+            '3b': 'third' in offense
+        }
+        fig_field = draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark)
+        st.pyplot(fig_field, use_container_width=True)
+        plt.close(fig_field)
+
+    with col_right:
+        # Win Probability Section Stacked First
         st.markdown("**Live Win Probability**")
         if win_probs:
             df_wp = pd.DataFrame(win_probs)
@@ -474,7 +475,7 @@ def render_brewers_dashboard(game_pk):
         else:
             st.info("Win probability timeline will plot as plays occur.")
 
-        # Out-of-Town Scoreboard Section
+        # Out-of-Town Scoreboard Stacked Second
         st.html(f'''
             <div class="ticker-container">
                 <div class="ticker-header">OUT-OF-TOWN SCOREBOARD ↻ 15s</div>
@@ -484,7 +485,7 @@ def render_brewers_dashboard(game_pk):
             </div>
         ''')
 
-        # Pitch Telemetry & Batted Ball Data Section
+        # Pitch Telemetry & Batted Ball Log Stacked Third
         col_pitch, col_log = st.columns([1, 1])
 
         with col_pitch:
