@@ -65,7 +65,7 @@ st.markdown(f"""
     }}
     
     .main-title {{
-        font-size: 1.6rem !important;
+        font-size: 2.2rem !important;
         font-weight: 700 !important;
         letter-spacing: -0.03em !important;
         color: {text_color} !important;
