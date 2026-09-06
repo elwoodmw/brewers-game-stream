@@ -29,11 +29,11 @@ st.markdown("""
         padding: 0.2rem 0rem;
         border-bottom: 1px solid #2D2D2D;
         margin-top: -1.0rem !important;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.0rem;
     }
     
     .main-title {
-        font-size: 2.0rem !important;
+        font-size: 1.8rem !important;
         font-weight: 900 !important;
         letter-spacing: -0.05em !important;
         color: #FFFFFF !important;
@@ -44,8 +44,22 @@ st.markdown("""
         background-color: #1E293B;
         border: 1px solid #334155;
         border-radius: 8px;
-        padding: 12px 20px;
-        margin-bottom: 20px;
+        padding: 10px 16px;
+        height: 85px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .ticker-container {
+        background-color: #0F172A;
+        border: 1px solid #1E293B;
+        border-radius: 8px;
+        padding: 10px 16px;
+        height: 85px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
     
     [data-testid="stSidebar"] {visibility: hidden; width: 0px; display: none;}
@@ -85,6 +99,21 @@ def get_today_brewers_game():
         pass
     return None, "No Milwaukee Brewers game scheduled today."
 
+@st.cache_data(ttl=120)
+def get_league_scoreboard():
+    """Fetch all MLB games scheduled for today for the out-of-town ticker."""
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    try:
+        schedule = statsapi.schedule(date=today_str)
+        # Filter out Brewers games so ticker only shows out-of-town scores
+        out_of_town = [
+            g for g in schedule 
+            if g.get('away_id') != BREWERS_TEAM_ID and g.get('home_id') != BREWERS_TEAM_ID
+        ]
+        return out_of_town
+    except Exception:
+        return []
+
 def fetch_live_game_feed(game_pk):
     """Fetch raw live feed JSON from MLB API."""
     url = f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
@@ -101,18 +130,15 @@ def convert_hc_to_field_feet(hc_x, hc_y):
     y_feet = (204 - hc_y) * 2.29
     return x_feet, y_feet
 
-# 3. Dynamic Field & Diamond Rendering
+# 3. Field Plotting
 def draw_full_baseball_field(batted_balls, runners, field_title_label):
-    """Draws a full ballpark diagram with the new dynamic stadium/weather header."""
     fig, ax = plt.subplots(figsize=(6, 6))
     fig.patch.set_facecolor('#121212')
     ax.set_facecolor('#121212')
 
-    # Get dimensions based on venue title context
     venue_key = next((k for k in STADIUM_DIMENSIONS if k.lower() in field_title_label.lower()), None)
     dims = STADIUM_DIMENSIONS.get(venue_key, DEFAULT_DIMS)
 
-    # Calculate Outfield Wall Arc
     num_points = 50
     angles = [(-math.pi/4) + (i * (math.pi/2) / (num_points - 1)) for i in range(num_points)]
     
@@ -128,13 +154,11 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label):
         wall_x.append(dist * math.sin(a))
         wall_y.append(dist * math.cos(a))
 
-    # Draw Foul Lines & Wall
     ax.plot([0, wall_x[0]], [0, wall_y[0]], color='#64748B', linewidth=1.5)
     ax.plot([0, wall_x[-1]], [0, wall_y[-1]], color='#64748B', linewidth=1.5)
     ax.plot(wall_x, wall_y, color='#1E293B', linewidth=4)
     ax.plot(wall_x, wall_y, color='#00B4D8', linewidth=1.5, linestyle='--')
 
-    # Dirt Arc & Baselines
     dirt_arc = patches.Arc((0, 60.5), 190, 190, angle=0, theta1=20, theta2=160, color='#1E293B', linewidth=1.5)
     ax.add_patch(dirt_arc)
 
@@ -142,13 +166,11 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label):
     infield_y = [0, 63.6, 127.3, 63.6, 0]
     ax.plot(infield_x, infield_y, color='#475569', linewidth=1.8)
 
-    # Mound & Rubber
     mound = patches.Circle((0, 60.5), radius=9, facecolor='#1E293B', edgecolor='#475569', linewidth=1)
     rubber = patches.Rectangle((-1.5, 60), 3, 1, facecolor='#FFFFFF', edgecolor='#FFFFFF')
     ax.add_patch(mound)
     ax.add_patch(rubber)
 
-    # Bases
     bases_coords = {'1b': (63.6, 63.6), '2b': (0, 127.3), '3b': (-63.6, 63.6)}
     for base, (bx, by) in bases_coords.items():
         is_occ = runners.get(base, False)
@@ -157,11 +179,9 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label):
         sq = patches.Rectangle((bx - 4.5, by - 4.5), 9, 9, angle=45, rotation_point='center', facecolor=fc, edgecolor=ec, zorder=5)
         ax.add_patch(sq)
 
-    # Home Plate
     hp = patches.Polygon([[0, 0], [2.5, 2.5], [2.5, 5], [-2.5, 5], [-2.5, 2.5]], facecolor='#FFFFFF', edgecolor='#FFFFFF', zorder=5)
     ax.add_patch(hp)
 
-    # Batted Ball Coordinates
     if batted_balls:
         for ball in batted_balls:
             hx, hy = ball.get('x_feet'), ball.get('y_feet')
@@ -182,9 +202,11 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label):
     ax.set_title(field_title_label, fontsize=9, fontweight='bold', color='#8E9AAF', pad=10)
     return fig
 
-# 4. Main Application Dashboard
+# 4. Main Application
 game_pk, game_summary = get_today_brewers_game()
-st.subheader(f"Game Status: {game_summary}")
+
+if 'ticker_idx' not in st.session_state:
+    st.session_state.ticker_idx = 0
 
 @st.fragment(run_every=15)
 def render_brewers_dashboard(game_pk):
@@ -202,7 +224,6 @@ def render_brewers_dashboard(game_pk):
     venue_name = venue_info.get('name', 'Unknown Ballpark')
     city_name = venue_info.get('location', {}).get('city', '')
     
-    # Extract Weather Info
     weather_info = game_data.get('weather', {})
     temp = weather_info.get('temp', '')
     condition = weather_info.get('condition', '')
@@ -216,7 +237,6 @@ def render_brewers_dashboard(game_pk):
     linescore = live_data.get('linescore', {})
     plays = live_data.get('plays', {}).get('allPlays', [])
 
-    # Scorebug Header
     teams = game_data.get('teams', {})
     away_name = teams.get('away', {}).get('clubName', 'AWAY')
     home_name = teams.get('home', {}).get('clubName', 'HOME')
@@ -235,22 +255,56 @@ def render_brewers_dashboard(game_pk):
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
 
-    st.markdown(f"""
-        <div class="scorebug-container">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-size: 1.5rem; font-weight: 900;">
-                    {away_name.upper()} <span style="color:#FFD166;">{away_runs}</span> &nbsp;@&nbsp; 
-                    <span style="color:#FFD166;">{home_runs}</span> {home_name.upper()}
+    # Out-of-town scores setup
+    oot_games = get_league_scoreboard()
+    if oot_games:
+        st.session_state.ticker_idx = (st.session_state.ticker_idx + 1) % len(oot_games)
+        curr_oot = oot_games[st.session_state.ticker_idx]
+        oot_away = curr_oot.get('away_name', 'Away')
+        oot_home = curr_oot.get('home_name', 'Home')
+        oot_away_score = curr_oot.get('away_score', 0)
+        oot_home_score = curr_oot.get('home_score', 0)
+        oot_status = curr_oot.get('status', 'Scheduled')
+    else:
+        oot_away, oot_home, oot_away_score, oot_home_score, oot_status = "N/A", "N/A", 0, 0, "No Games"
+
+    # Header Row: Compact Scorebug (60%) + Out-of-Town Ticker (40%)
+    col_scorebug, col_ticker = st.columns([1.5, 1])
+
+    with col_scorebug:
+        st.markdown(f"""
+            <div class="scorebug-container">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 1.25rem; font-weight: 900;">
+                        {away_name.upper()} <span style="color:#FFD166;">{away_runs}</span> &nbsp;@&nbsp; 
+                        <span style="color:#FFD166;">{home_runs}</span> {home_name.upper()}
+                    </div>
+                    <div style="font-size: 0.95rem; font-weight: 600; color: #94A3B8;">
+                        {inning_state} {inning_num} | {outs} Outs
+                    </div>
                 </div>
-                <div style="font-size: 1.1rem; font-weight: 600; color: #94A3B8;">
-                    {inning_state} {inning_num} | {outs} Outs
+                <div style="margin-top: 4px; font-size: 0.8rem; color: #CBD5E1;">
+                    <strong>P:</strong> {pitcher_name} &nbsp;|&nbsp; <strong>AB:</strong> {batter_name}
                 </div>
             </div>
-            <div style="margin-top: 8px; font-size: 0.9rem; color: #CBD5E1;">
-                <strong>Pitching:</strong> {pitcher_name} &nbsp;|&nbsp; <strong>At Bat:</strong> {batter_name}
+        """, unsafe_allow_html=True)
+
+    with col_ticker:
+        st.markdown(f"""
+            <div class="ticker-container">
+                <div style="font-size: 0.7rem; font-weight: 800; color: #00B4D8; letter-spacing: 0.05em; margin-bottom: 2px;">
+                    OUT-OF-TOWN SCOREBOARD ↻ 15s
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 1.05rem; font-weight: 800;">
+                        {oot_away} <span style="color:#FFD166;">{oot_away_score}</span> @ <span style="color:#FFD166;">{oot_home_score}</span> {oot_home}
+                    </div>
+                    <div style="font-size: 0.8rem; font-weight: 600; color: #94A3B8;">
+                        {oot_status}
+                    </div>
+                </div>
             </div>
-        </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # Process Plays Data
     pitch_list = []
@@ -262,7 +316,6 @@ def render_brewers_dashboard(game_pk):
         pitcher = play.get('matchup', {}).get('pitcher', {}).get('fullName', 'Unknown')
         
         for e in p_events:
-            # Pitch Telemetry
             pitch_data = e.get('pitchData', {})
             pfx = pitch_data.get('coordinates', {})
             if 'pfxX' in pfx and 'pfxZ' in pfx:
@@ -274,7 +327,6 @@ def render_brewers_dashboard(game_pk):
                     'vert_break_in': pfx['pfxZ'],
                 })
 
-            # Hit Data
             hit_data = e.get('hitData', {})
             if hit_data:
                 hc_x = hit_data.get('coordinates', {}).get('coordX')
@@ -292,7 +344,7 @@ def render_brewers_dashboard(game_pk):
                     'y_feet': fy
                 })
 
-    # Side-By-Side 3-Column Layout (50% Spray Chart, 25% Pitch Telemetry, 25% Batted Ball Log)
+    # Side-By-Side Layout (50% Spray Chart, 25% Pitch Telemetry, 25% Batted Ball Log)
     col_field, col_pitch, col_log = st.columns([2, 1, 1])
 
     with col_field:
