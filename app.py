@@ -376,7 +376,7 @@ def draw_full_baseball_field(batted_balls, runners_info, field_title_label, is_d
     ax.set_title(field_title_label, fontsize=10, fontweight='bold', color=subtext_color, pad=12, fontfamily='Fira Code')
     return fig
 
-# Helper to render clean 15-slot HTML tables with horizontal scrolling capability and zero vertical scrollbars
+# Helper to render clean exactly 15-slot HTML tables with horizontal scrolling and zero vertical scrollbars
 def render_custom_table(headers, rows, n_slots=15):
     padded_rows = list(rows)
     for i in range(len(padded_rows), n_slots):
@@ -503,7 +503,7 @@ def render_brewers_dashboard(game_pk):
                 })
                 p_num += 1
 
-        # 2. Batted Balls Log & Spray Chart
+        # 2. Batted Balls Log & Spray Chart (Ensuring up to 15 slots)
         target_half = 'top' if inning_state.lower() in ['top', 'top 1', 't'] else 'bottom'
         current_inning_plays = [
             p for p in plays 
@@ -532,7 +532,7 @@ def render_brewers_dashboard(game_pk):
                         'x_feet': fx,
                         'y_feet': fy
                     })
-        half_inning_batted_balls = all_batted[-15:]
+        half_inning_batted_balls = all_batted[:15]
 
     oot_games = get_league_scoreboard()
     cards = []
