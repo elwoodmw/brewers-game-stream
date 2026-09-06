@@ -144,6 +144,37 @@ st.markdown(f"""
         color: {subtext_color};
         margin-top: 6px;
     }}
+
+    .custom-table {{
+        width: 100%;
+        border-collapse: collapse;
+        background-color: {card_bg};
+        border: 1px solid {card_border};
+        border-radius: 8px;
+        overflow: hidden;
+        font-family: 'Fira Code', monospace;
+        font-size: 0.78rem;
+        margin-top: 8px;
+    }}
+
+    .custom-table th, .custom-table td {{
+        padding: 8px 10px;
+        border-bottom: 1px solid {card_border};
+        color: {text_color};
+        text-align: left;
+        white-space: nowrap;
+        height: 33px;
+    }}
+
+    .custom-table th {{
+        background-color: {ticker_bg};
+        font-weight: 700;
+        font-size: 0.75rem;
+    }}
+
+    .custom-table tr:last-child td {{
+        border-bottom: none;
+    }}
     
     [data-testid="stSidebar"] {{display: none;}}
     [data-testid="stHeader"] {{visibility: hidden;}}
@@ -339,6 +370,32 @@ def draw_full_baseball_field(batted_balls, runners_info, field_title_label, is_d
     ax.axis('off')
     ax.set_title(field_title_label, fontsize=10, fontweight='bold', color=subtext_color, pad=12, fontfamily='Fira Code')
     return fig
+
+# Helper to render clean 15-slot HTML tables without internal scrollbars
+def render_custom_table(headers, rows, n_slots=15):
+    padded_rows = list(rows)
+    for i in range(len(padded_rows), n_slots):
+        padded_rows.append({h: "" for h in headers})
+    padded_rows = padded_rows[:n_slots]
+    
+    # Ensure '#' shows properly if it's the first header
+    th_html = "".join([f"<th>{h}</th>" for h in headers])
+    tr_html = ""
+    for idx, r in enumerate(padded_rows):
+        # Auto-fill slot number if '#' is first column and row is empty
+        row_dict = dict(r)
+        if headers[0] == '#' and not row_dict.get('#'):
+            row_dict['#'] = idx + 1
+            
+        tds = "".join([f"<td>{row_dict.get(h, '')}</td>" for h in headers])
+        tr_html += f"<tr>{tds}</tr>"
+        
+    return f"""
+    <table class="custom-table">
+        <thead><tr>{th_html}</tr></thead>
+        <tbody>{tr_html}</tbody>
+    </table>
+    """
 
 # 4. Main Application
 game_pk, game_summary = get_today_brewers_game()
@@ -549,55 +606,14 @@ def render_brewers_dashboard(game_pk):
 
         with col_pitch:
             st.markdown("**Current At-Bat Pitch Log**")
-            while len(current_ab_pitches) < 15:
-                current_ab_pitches.append({
-                    '#': len(current_ab_pitches) + 1,
-                    'Pitch': '',
-                    'Velo': '',
-                    'Spin': '',
-                    'Result': ''
-                })
-            df_pitches = pd.DataFrame(current_ab_pitches[:15])
-            
-            st.dataframe(
-                df_pitches, 
-                use_container_width=True, 
-                hide_index=True, 
-                height=495,
-                column_config={
-                    "#": st.column_config.NumberColumn("#", width=30),
-                    "Pitch": st.column_config.TextColumn("Pitch", width=45),
-                    "Velo": st.column_config.TextColumn("Velo", width="small"),
-                    "Spin": st.column_config.TextColumn("Spin", width="small"),
-                    "Result": st.column_config.TextColumn("Result", width="medium")
-                }
-            )
+            pitch_headers = ['#', 'Pitch', 'Velo', 'Spin', 'Result']
+            pitch_html = render_custom_table(pitch_headers, current_ab_pitches, n_slots=15)
+            st.html(pitch_html)
 
         with col_log:
             st.markdown(f"**Half-Inning Batted Balls ({inning_state} {inning_num})**")
-            batted_data = list(half_inning_batted_balls)
-            while len(batted_data) < 15:
-                batted_data.append({
-                    'Batter': '',
-                    'Result': '',
-                    'EV (mph)': '',
-                    'LA (°)': '',
-                    'Dist (ft)': ''
-                })
-            df_batted = pd.DataFrame(batted_data[:15])[['Batter', 'Result', 'EV (mph)', 'LA (°)', 'Dist (ft)']]
-            
-            st.dataframe(
-                df_batted,
-                use_container_width=True,
-                hide_index=True,
-                height=495,
-                column_config={
-                    "Batter": st.column_config.TextColumn("Batter", width=110),
-                    "Result": st.column_config.TextColumn("Result", width="medium"),
-                    "EV (mph)": st.column_config.TextColumn("EV (mph)", width="small"),
-                    "LA (°)": st.column_config.TextColumn("LA (°)", width="small"),
-                    "Dist (ft)": st.column_config.TextColumn("Dist (ft)", width="small")
-                }
-            )
+            batted_headers = ['Batter', 'Result', 'EV (mph)', 'LA (°)', 'Dist (ft)']
+            batted_html = render_custom_table(batted_headers, half_inning_batted_balls, n_slots=15)
+            st.html(batted_html)
 
 render_brewers_dashboard(game_pk)
