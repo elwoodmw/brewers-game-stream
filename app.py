@@ -164,14 +164,18 @@ st.markdown(f"""
         font-family: 'Fira Code', monospace;
         font-size: 0.78rem;
         white-space: nowrap;
+        table-layout: fixed;
     }}
 
     .custom-table th, .custom-table td {{
-        padding: 8px 10px;
+        padding: 0 10px;
         border-bottom: 1px solid {card_border};
         color: {text_color};
         text-align: left;
-        height: 33px;
+        height: 35.7px;
+        line-height: 35.7px;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }}
 
     .custom-table th {{
@@ -379,8 +383,8 @@ def draw_full_baseball_field(batted_balls, runners_info, field_title_label, is_d
     ax.set_title(field_title_label, fontsize=10, fontweight='bold', color=subtext_color, pad=12, fontfamily='Fira Code')
     return fig
 
-# Helper to render clean exactly 15-slot HTML tables with fixed height and zero vertical scrollbars
-def render_custom_table(headers, rows, n_slots=15, omit_last_number=False):
+# Helper to render clean exactly 14-slot HTML tables with fixed height and zero vertical scrollbars
+def render_custom_table(headers, rows, n_slots=14, omit_last_number=False):
     padded_rows = list(rows)
     for i in range(len(padded_rows), n_slots):
         padded_rows.append({h: "" for h in headers})
@@ -530,6 +534,7 @@ def render_brewers_dashboard(game_pk):
                         total_dist=dist
                     )
                     all_batted.append({
+                        '#': len(all_batted) + 1,
                         'Batter': batter,
                         'Result': p.get('result', {}).get('event', 'In Play'),
                         'EV (mph)': hit_data.get('launchSpeed', 'N/A'),
@@ -538,7 +543,7 @@ def render_brewers_dashboard(game_pk):
                         'x_feet': fx,
                         'y_feet': fy
                     })
-        half_inning_batted_balls = all_batted[:15]
+        half_inning_batted_balls = all_batted[:14]
 
     oot_games = get_league_scoreboard()
     cards = []
@@ -618,13 +623,13 @@ def render_brewers_dashboard(game_pk):
         with col_pitch:
             st.markdown("<div style='height: 24px; display: flex; align-items: center;'><b>Current At-Bat Pitch Log</b></div>", unsafe_allow_html=True)
             pitch_headers = ['#', 'Pitch', 'Velo', 'Spin', 'Result']
-            pitch_html = render_custom_table(pitch_headers, current_ab_pitches, n_slots=15, omit_last_number=True)
+            pitch_html = render_custom_table(pitch_headers, current_ab_pitches, n_slots=14, omit_last_number=True)
             st.html(pitch_html)
 
         with col_log:
             st.markdown(f"<div style='height: 24px; display: flex; align-items: center;'><b>Batted Balls ({inning_state[:3]} {inning_num})</b></div>", unsafe_allow_html=True)
-            batted_headers = ['Batter', 'Result', 'EV (mph)', 'LA (°)', 'Dist (ft)']
-            batted_html = render_custom_table(batted_headers, half_inning_batted_balls, n_slots=15, omit_last_number=False)
+            batted_headers = ['#', 'Batter', 'Result', 'EV (mph)', 'LA (°)', 'Dist (ft)']
+            batted_html = render_custom_table(batted_headers, half_inning_batted_balls, n_slots=14, omit_last_number=False)
             st.html(batted_html)
 
 render_brewers_dashboard(game_pk)
