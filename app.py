@@ -380,7 +380,7 @@ def draw_full_baseball_field(batted_balls, runners_info, field_title_label, is_d
     return fig
 
 # Helper to render clean exactly 15-slot HTML tables with fixed height and zero vertical scrollbars
-def render_custom_table(headers, rows, n_slots=15):
+def render_custom_table(headers, rows, n_slots=15, omit_last_number=False):
     padded_rows = list(rows)
     for i in range(len(padded_rows), n_slots):
         padded_rows.append({h: "" for h in headers})
@@ -391,7 +391,10 @@ def render_custom_table(headers, rows, n_slots=15):
     for idx, r in enumerate(padded_rows):
         row_dict = dict(r)
         if headers[0] == '#' and not row_dict.get('#'):
-            row_dict['#'] = idx + 1
+            if omit_last_number and idx == n_slots - 1:
+                row_dict['#'] = ""
+            else:
+                row_dict['#'] = idx + 1
             
         tds = "".join([f"<td>{row_dict.get(h, '')}</td>" for h in headers])
         tr_html += f"<tr>{tds}</tr>"
@@ -572,19 +575,19 @@ def render_brewers_dashboard(game_pk):
         st.html(f'''
             <div class="scorebug-container">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 1.25rem; font-weight: 700;">
+                    <div style="font-size: 1.45rem; font-weight: 700;">
                         {away_name.upper()} <span style="color:{accent_yellow};">{away_runs}</span> &nbsp;@&nbsp; 
                         {home_name.upper()} <span style="color:{accent_yellow};">{home_runs}</span>
                     </div>
-                    <div style="font-size: 0.95rem; font-weight: 500; color: {subtext_color};">
+                    <div style="font-size: 1.1rem; font-weight: 600; color: {subtext_color};">
                         {inning_state} {inning_num} | {outs} Outs
                     </div>
                 </div>
-                <div style="margin-top: 6px; font-size: 0.8rem; color: {text_color};">
+                <div style="margin-top: 8px; font-size: 0.92rem; color: {text_color};">
                     <strong>P:</strong> {pitcher_name} <span style="color:{accent_yellow};">({pitch_count})</span> &nbsp;|&nbsp; 
                     <strong>AB:</strong> {batter_name}
                 </div>
-                <div style="margin-top: 4px; font-size: 0.72rem; color: {subtext_color};">
+                <div style="margin-top: 6px; font-size: 0.82rem; color: {subtext_color};">
                     <strong>On Deck:</strong> {on_deck_name} &nbsp;|&nbsp; 
                     <strong>In Hole:</strong> {in_hole_name}
                 </div>
@@ -615,13 +618,13 @@ def render_brewers_dashboard(game_pk):
         with col_pitch:
             st.markdown("<div style='height: 24px; display: flex; align-items: center;'><b>Current At-Bat Pitch Log</b></div>", unsafe_allow_html=True)
             pitch_headers = ['#', 'Pitch', 'Velo', 'Spin', 'Result']
-            pitch_html = render_custom_table(pitch_headers, current_ab_pitches, n_slots=15)
+            pitch_html = render_custom_table(pitch_headers, current_ab_pitches, n_slots=15, omit_last_number=True)
             st.html(pitch_html)
 
         with col_log:
             st.markdown(f"<div style='height: 24px; display: flex; align-items: center;'><b>Batted Balls ({inning_state[:3]} {inning_num})</b></div>", unsafe_allow_html=True)
             batted_headers = ['#', 'Batter', 'Result', 'EV (mph)', 'LA (°)', 'Dist (ft)']
-            batted_html = render_custom_table(batted_headers, half_inning_batted_balls, n_slots=15)
+            batted_html = render_custom_table(batted_headers, half_inning_batted_balls, n_slots=15, omit_last_number=False)
             st.html(batted_html)
 
 render_brewers_dashboard(game_pk)
