@@ -4,12 +4,11 @@ import pandas as pd
 import requests
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import seaborn as sns
 import streamlit as st
 import statsapi
 
 # 1. Page Configuration
-st.set_page_config(page_title="Milwaukee Brewers Live Companion", layout="wide")
+st.set_page_config(page_title="Milwaukee Brewers Live Statcast Companion", layout="wide")
 
 # Initialize Session State for Theme Toggle
 if 'is_dark' not in st.session_state:
@@ -173,7 +172,7 @@ STADIUM_DIMENSIONS = {
 
 DEFAULT_DIMS = {'lf': 330, 'lcf': 375, 'cf': 400, 'rcf': 375, 'rf': 330}
 
-# 2. Data Fetching Utilities
+# 2. Data Fetching & Coordinate Utilities
 @st.cache_data(ttl=60)
 def get_today_brewers_game():
     today_str = datetime.date.today().strftime('%Y-%m-%d')
@@ -206,12 +205,22 @@ def fetch_live_game_feed(game_pk):
         return resp.json()
     return None
 
-def convert_hc_to_field_feet(hc_x, hc_y):
+def convert_hc_to_field_feet(hc_x, hc_y, total_dist=None):
     if hc_x is None or hc_y is None:
         return None, None
-    x_feet = 2.5 * (hc_x - 125.42)
-    y_feet = 2.5 * (198.27 - hc_y)
-    return x_feet, y_feet
+    # Standard Statcast coordinate transformation relative to home plate (0,0)
+    x = 2.5 * (hc_x - 125.42)
+    y = 2.5 * (198.27 - hc_y)
+    
+    # Scale to reported Statcast distance when available for precise placement
+    if total_dist and total_dist > 0:
+        raw_dist = math.hypot(x, y)
+        if raw_dist > 0:
+            scale = total_dist / raw_dist
+            x *= scale
+            y *= scale
+
+    return x, y
 
 def format_compact_status(status_str):
     if any(k in status_str for k in ["Inning", "Top", "Bottom", "Bot", "Mid", "End"]):
@@ -289,9 +298,9 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
                 ax.plot(
                     hx, hy, 
                     marker='o', 
-                    markersize=7, 
-                    markerfacecolor='#FFFFFF', 
-                    markeredgecolor='#FFD166', 
+                    markersize=8, 
+                    markerfacecolor='#FFD166', 
+                    markeredgecolor='#FFFFFF', 
                     markeredgewidth=1.5,
                     zorder=6
                 )
@@ -356,7 +365,6 @@ def render_brewers_dashboard(game_pk):
     batter_name = offense.get('batter', {}).get('fullName', 'N/A')
     pitcher_name = defense.get('pitcher', {}).get('fullName', 'N/A')
 
-    # Extract On Deck and In Hole batters
     on_deck_id = offense.get('onDeck', {}).get('id')
     in_hole_id = offense.get('inHole', {}).get('id')
 
@@ -372,7 +380,6 @@ def render_brewers_dashboard(game_pk):
         pitcher_id = defense.get('pitcher', {}).get('id')
         current_play = plays[-1] if plays else None
 
-        # Calculate pitch count & win probabilities
         for idx, p in enumerate(plays):
             if p.get('matchup', {}).get('pitcher', {}).get('id') == pitcher_id:
                 p_events = p.get('playEvents', [])
@@ -384,7 +391,7 @@ def render_brewers_dashboard(game_pk):
             if play_wp is not None:
                 win_probs.append({'play_idx': idx + 1, 'home_wp': play_wp})
 
-        # 1. Pitch-By-Pitch for Current At-Bat Only (Resets every at-bat)
+        # 1. Pitch-By-Pitch for Current At-Bat (Abbreviated Pitch Names, No Zone Column)
         if current_play:
             p_events = current_play.get('playEvents', [])
             p_num = 1
@@ -393,22 +400,24 @@ def render_brewers_dashboard(game_pk):
                     p_data = e.get('pitchData', {})
                     details = e.get('details', {})
                     
+                    type_info = details.get('type', {})
+                    # Use Statcast pitch code abbreviation (e.g., FF, SL, CU, CH)
+                    pitch_abbrev = type_info.get('code', type_info.get('description', 'P'))
+                    
                     velo = p_data.get('startSpeed', 'N/A')
                     spin = p_data.get('breaks', {}).get('spinRate', 'N/A')
-                    zone = p_data.get('zone', 'N/A')
                     res = details.get('description', 'N/A')
 
                     current_ab_pitches.append({
                         '#': p_num,
-                        'Pitch': details.get('type', {}).get('description', 'Pitch'),
+                        'Pitch': pitch_abbrev,
                         'Velo': f"{velo} mph" if velo != 'N/A' else 'N/A',
                         'Spin': f"{spin} rpm" if spin != 'N/A' else 'N/A',
-                        'Zone': zone,
                         'Result': res
                     })
                     p_num += 1
 
-        # 2. Batted Balls & Spray Chart (Resets every half-inning)
+        # 2. Batted Balls Log & Spray Chart
         target_half = 'top' if inning_state.lower() in ['top', 'top 1', 't'] else 'bottom'
         current_inning_plays = [
             p for p in plays 
@@ -421,16 +430,18 @@ def render_brewers_dashboard(game_pk):
             for e in p.get('playEvents', []):
                 hit_data = e.get('hitData', {})
                 if hit_data:
+                    dist = hit_data.get('totalDistance')
                     fx, fy = convert_hc_to_field_feet(
                         hit_data.get('coordinates', {}).get('coordX'),
-                        hit_data.get('coordinates', {}).get('coordY')
+                        hit_data.get('coordinates', {}).get('coordY'),
+                        total_dist=dist
                     )
                     half_inning_batted_balls.append({
-                        'batter': batter,
-                        'event': p.get('result', {}).get('event', 'In Play'),
-                        'ev': hit_data.get('launchSpeed', 'N/A'),
-                        'la': hit_data.get('launchAngle', 'N/A'),
-                        'dist': hit_data.get('totalDistance', 'N/A'),
+                        'Batter': batter,
+                        'Result': p.get('result', {}).get('event', 'In Play'),
+                        'EV (mph)': hit_data.get('launchSpeed', 'N/A'),
+                        'LA (°)': hit_data.get('launchAngle', 'N/A'),
+                        'Dist (ft)': dist if dist is not None else 'N/A',
                         'x_feet': fx,
                         'y_feet': fy
                     })
@@ -550,11 +561,13 @@ def render_brewers_dashboard(game_pk):
         with col_log:
             st.markdown(f"**Half-Inning Batted Balls ({inning_state} {inning_num})**")
             if half_inning_batted_balls:
-                for hit in reversed(half_inning_batted_balls):
-                    st.markdown(
-                        f"• **{hit['batter']}**: {hit['event']} "
-                        f"({hit['ev']} mph, {hit['la']}°, {hit['dist']} ft)"
-                    )
+                df_batted = pd.DataFrame(half_inning_batted_balls)[['Batter', 'Result', 'EV (mph)', 'LA (°)', 'Dist (ft)']]
+                st.dataframe(
+                    df_batted,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=280
+                )
             else:
                 st.info("No balls in play this half-inning.")
 
