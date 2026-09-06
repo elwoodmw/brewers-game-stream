@@ -232,7 +232,7 @@ def format_compact_status(status_str):
     return status_str[:6].upper()
 
 # 3. Field Plotting
-def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
+def draw_full_baseball_field(batted_balls, runners_info, field_title_label, is_dark):
     fig, ax = plt.subplots(figsize=(7, 7.5))
     bg_c = '#121212' if is_dark else '#F8FAFC'
     border_c = '#1E293B' if is_dark else '#CBD5E1'
@@ -280,11 +280,25 @@ def draw_full_baseball_field(batted_balls, runners, field_title_label, is_dark):
 
     bases_coords = {'1b': (63.64, 63.64), '2b': (0, 127.28), '3b': (-63.64, 63.64)}
     for base, (bx, by) in bases_coords.items():
-        is_occ = runners.get(base, False)
+        runner = runners_info.get(base)
+        is_occ = runner is not None
         fc = '#FFD166' if is_occ else border_c
         ec = '#FFD166' if is_occ else '#94A3B8'
         sq = patches.Rectangle((bx - 3.5, by - 3.5), 7, 7, angle=45, rotation_point='center', facecolor=fc, edgecolor=ec, zorder=5)
         ax.add_patch(sq)
+        
+        if is_occ and runner:
+            name_parts = runner.split(' ')
+            short_name = name_parts[-1] if len(name_parts) > 1 else runner
+            ax.text(
+                bx, by + 10, short_name,
+                fontsize=7,
+                fontweight='bold',
+                color='#FFD166',
+                fontfamily='Fira Code',
+                ha='center',
+                zorder=8
+            )
 
     hp = patches.Polygon([[0, 0], [2.5, 2.5], [2.5, 5], [-2.5, 5], [-2.5, 2.5]], facecolor='#FFFFFF', edgecolor='#FFFFFF', zorder=5)
     ax.add_patch(hp)
@@ -401,14 +415,13 @@ def render_brewers_dashboard(game_pk):
             if wp is not None:
                 win_probs.append({'play_idx': idx + 1, 'home_wp': wp})
 
-        # 1. Pitch-By-Pitch for Current At-Bat (holding up to 12 recent pitches)
+        # 1. Pitch-By-Pitch for Current At-Bat (dynamic rows matching all pitches in current AB)
         if current_play:
             p_events = current_play.get('playEvents', [])
             pitch_events_list = [e for e in p_events if e.get('isPitch')]
-            recent_pitch_events = pitch_events_list[-12:]
             
-            p_num = max(1, len(pitch_events_list) - len(recent_pitch_events) + 1)
-            for e in recent_pitch_events:
+            p_num = 1
+            for e in pitch_events_list:
                 p_data = e.get('pitchData', {})
                 details = e.get('details', {})
                 
@@ -428,7 +441,7 @@ def render_brewers_dashboard(game_pk):
                 })
                 p_num += 1
 
-        # 2. Batted Balls Log & Spray Chart (holding up to 12 recent batted balls)
+        # 2. Batted Balls Log & Spray Chart
         target_half = 'top' if inning_state.lower() in ['top', 'top 1', 't'] else 'bottom'
         current_inning_plays = [
             p for p in plays 
@@ -513,12 +526,12 @@ def render_brewers_dashboard(game_pk):
             </div>
         ''')
 
-        runners = {
-            '1b': 'first' in offense,
-            '2b': 'second' in offense,
-            '3b': 'third' in offense
+        runners_info = {
+            '1b': offense.get('first', {}).get('fullName') if 'first' in offense else None,
+            '2b': offense.get('second', {}).get('fullName') if 'second' in offense else None,
+            '3b': offense.get('third', {}).get('fullName') if 'third' in offense else None
         }
-        fig_field = draw_full_baseball_field(half_inning_batted_balls, runners, field_title_label, is_dark)
+        fig_field = draw_full_baseball_field(half_inning_batted_balls, runners_info, field_title_label, is_dark)
         st.pyplot(fig_field, use_container_width=True)
         plt.close(fig_field)
 
@@ -560,7 +573,7 @@ def render_brewers_dashboard(game_pk):
         col_pitch, col_log = st.columns([1, 1])
 
         with col_pitch:
-            st.markdown("**Current At-Bat Pitch Log (Up to 12)**")
+            st.markdown("**Current At-Bat Pitch Log**")
             if current_ab_pitches:
                 df_pitches = pd.DataFrame(current_ab_pitches)
                 st.dataframe(
@@ -569,8 +582,8 @@ def render_brewers_dashboard(game_pk):
                     hide_index=True, 
                     height=500,
                     column_config={
-                        "#": st.column_config.NumberColumn("#", width="small"),
-                        "Pitch": st.column_config.TextColumn("Pitch", width="small"),
+                        "#": st.column_config.NumberColumn("#", width=40),
+                        "Pitch": st.column_config.TextColumn("Pitch", width=50),
                         "Velo": st.column_config.TextColumn("Velo", width="small"),
                         "Spin": st.column_config.TextColumn("Spin", width="small"),
                         "Result": st.column_config.TextColumn("Result", width="medium")
