@@ -11,16 +11,24 @@ import statsapi
 # 1. Page Configuration
 st.set_page_config(page_title="Milwaukee Brewers Live Companion", layout="wide")
 
-# Theme Selection State
+# Initialize Session State for Theme Toggle
 if 'is_dark' not in st.session_state:
     st.session_state.is_dark = True
+
+# Callback to handle dark mode toggle cleanly in a single click
+def toggle_dark_mode():
+    st.session_state.is_dark = st.session_state.dark_mode_toggle
 
 # Top Header Layout with Top-Right Theme Toggle
 col_header, col_toggle = st.columns([5, 1])
 
 with col_toggle:
-    dark_mode = st.toggle("Dark Mode", value=st.session_state.is_dark)
-    st.session_state.is_dark = dark_mode
+    st.toggle(
+        "Dark Mode", 
+        value=st.session_state.is_dark, 
+        key="dark_mode_toggle", 
+        on_change=toggle_dark_mode
+    )
 
 is_dark = st.session_state.is_dark
 
@@ -421,7 +429,7 @@ def render_brewers_dashboard(game_pk):
     col_left, col_right = st.columns([5, 7])
 
     with col_left:
-        # Live Scorebug placed back on the left top above the field
+        # Live Scorebug placed back on top left above the field
         st.html(f'''
             <div class="scorebug-container">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
