@@ -145,16 +145,22 @@ st.markdown(f"""
         margin-top: 6px;
     }}
 
-    .custom-table {{
+    .table-wrapper {{
         width: 100%;
-        border-collapse: collapse;
+        overflow-x: auto;
+        overflow-y: hidden;
         background-color: {card_bg};
         border: 1px solid {card_border};
         border-radius: 8px;
-        overflow: hidden;
+        margin-top: 8px;
+    }}
+
+    .custom-table {{
+        width: 100%;
+        border-collapse: collapse;
         font-family: 'Fira Code', monospace;
         font-size: 0.78rem;
-        margin-top: 8px;
+        white-space: nowrap;
     }}
 
     .custom-table th, .custom-table td {{
@@ -162,7 +168,6 @@ st.markdown(f"""
         border-bottom: 1px solid {card_border};
         color: {text_color};
         text-align: left;
-        white-space: nowrap;
         height: 33px;
     }}
 
@@ -371,18 +376,16 @@ def draw_full_baseball_field(batted_balls, runners_info, field_title_label, is_d
     ax.set_title(field_title_label, fontsize=10, fontweight='bold', color=subtext_color, pad=12, fontfamily='Fira Code')
     return fig
 
-# Helper to render clean 15-slot HTML tables without internal scrollbars
+# Helper to render clean 15-slot HTML tables with horizontal scrolling capability and zero vertical scrollbars
 def render_custom_table(headers, rows, n_slots=15):
     padded_rows = list(rows)
     for i in range(len(padded_rows), n_slots):
         padded_rows.append({h: "" for h in headers})
     padded_rows = padded_rows[:n_slots]
     
-    # Ensure '#' shows properly if it's the first header
     th_html = "".join([f"<th>{h}</th>" for h in headers])
     tr_html = ""
     for idx, r in enumerate(padded_rows):
-        # Auto-fill slot number if '#' is first column and row is empty
         row_dict = dict(r)
         if headers[0] == '#' and not row_dict.get('#'):
             row_dict['#'] = idx + 1
@@ -391,10 +394,12 @@ def render_custom_table(headers, rows, n_slots=15):
         tr_html += f"<tr>{tds}</tr>"
         
     return f"""
-    <table class="custom-table">
-        <thead><tr>{th_html}</tr></thead>
-        <tbody>{tr_html}</tbody>
-    </table>
+    <div class="table-wrapper">
+        <table class="custom-table">
+            <thead><tr>{th_html}</tr></thead>
+            <tbody>{tr_html}</tbody>
+        </table>
+    </div>
     """
 
 # 4. Main Application
