@@ -1,7 +1,6 @@
 streamlit
 pandas
-numpy
+requests
 matplotlib
 seaborn
-mlb-statsapi
-requests
+MLB-StatsAPI
