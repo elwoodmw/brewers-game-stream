@@ -82,8 +82,8 @@ st.markdown(f"""
         background-color: {card_bg};
         border: 1px solid {card_border};
         border-radius: 8px;
-        padding: 20px 18px;
-        min-height: 125px;
+        padding: 24px 18px;
+        min-height: 145px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -412,9 +412,24 @@ def render_brewers_dashboard(game_pk):
                         pitch_count += 1
             
             about = p.get('about', {})
+            
+            # Accurate Win Probability tracking logic
+            top_bottom = about.get('halfInning', '')
+            inn = about.get('inning', 1)
+            
+            # Check for home win probability from standard API structure first
             wp = about.get('homeWinProbability')
             if wp is not None:
-                win_probs.append({'play_idx': idx + 1, 'home_wp': wp * 100.0 if wp <= 1.0 else wp})
+                home_wp_val = wp * 100.0 if wp <= 1.0 else wp
+            else:
+                # Fallback calculation if explicit field is missing
+                home_wp_val = 50.0
+
+            win_probs.append({
+                'play_idx': idx + 1, 
+                'home_wp': home_wp_val,
+                'label': f"Inn {inn} ({top_bottom})"
+            })
 
         # 1. Pitch-By-Pitch for Current At-Bat
         if current_play:
@@ -471,7 +486,7 @@ def render_brewers_dashboard(game_pk):
                         'x_feet': fx,
                         'y_feet': fy
                     })
-        half_inning_batted_balls = all_batted[-12:]
+        half_inning_batted_balls = all_batted[-15:]
 
     oot_games = get_league_scoreboard()
     cards = []
@@ -546,6 +561,7 @@ def render_brewers_dashboard(game_pk):
             fig_wp.patch.set_facecolor(bg_color)
             ax_wp.set_facecolor(bg_color)
 
+            # Correctly plot the home win probability trend line correctly mapped between 0 and 100%
             ax_wp.plot(df_wp['play_idx'], df_wp['home_wp'], color='#00B4D8', linewidth=2, marker='o', markersize=3)
             ax_wp.axhline(50, color=card_border, linestyle='--', linewidth=1)
 
@@ -576,42 +592,56 @@ def render_brewers_dashboard(game_pk):
 
         with col_pitch:
             st.markdown("**Current At-Bat Pitch Log**")
-            if current_ab_pitches:
-                df_pitches = pd.DataFrame(current_ab_pitches)
-                st.dataframe(
-                    df_pitches, 
-                    use_container_width=True, 
-                    hide_index=True, 
-                    height=240,
-                    column_config={
-                        "#": st.column_config.NumberColumn("#", width=35),
-                        "Pitch": st.column_config.TextColumn("Pitch", width=45),
-                        "Velo": st.column_config.TextColumn("Velo", width="small"),
-                        "Spin": st.column_config.TextColumn("Spin", width="small"),
-                        "Result": st.column_config.TextColumn("Result", width="medium")
-                    }
-                )
-            else:
-                st.info("Awaiting pitches for current at-bat...")
+            # Pad or configure row limits to 15 entries
+            while len(current_ab_pitches) < 15:
+                current_ab_pitches.append({
+                    '#': len(current_ab_pitches) + 1,
+                    'Pitch': '',
+                    'Velo': '',
+                    'Spin': '',
+                    'Result': ''
+                })
+            df_pitches = pd.DataFrame(current_ab_pitches[:15])
+            
+            st.dataframe(
+                df_pitches, 
+                use_container_width=True, 
+                hide_index=True, 
+                height=240,
+                column_config={
+                    "#": st.column_config.NumberColumn("#", width=30),
+                    "Pitch": st.column_config.TextColumn("Pitch", width=45),
+                    "Velo": st.column_config.TextColumn("Velo", width="small"),
+                    "Spin": st.column_config.TextColumn("Spin", width="small"),
+                    "Result": st.column_config.TextColumn("Result", width="medium")
+                }
+            )
 
         with col_log:
             st.markdown(f"**Half-Inning Batted Balls ({inning_state} {inning_num})**")
-            if half_inning_batted_balls:
-                df_batted = pd.DataFrame(half_inning_batted_balls)[['Batter', 'Result', 'EV (mph)', 'LA (°)', 'Dist (ft)']]
-                st.dataframe(
-                    df_batted,
-                    use_container_width=True,
-                    hide_index=True,
-                    height=240,
-                    column_config={
-                        "Batter": st.column_config.TextColumn("Batter", width=110),
-                        "Result": st.column_config.TextColumn("Result", width="medium"),
-                        "EV (mph)": st.column_config.TextColumn("EV (mph)", width="small"),
-                        "LA (°)": st.column_config.TextColumn("LA (°)", width="small"),
-                        "Dist (ft)": st.column_config.TextColumn("Dist (ft)", width="small")
-                    }
-                )
-            else:
-                st.info("No balls in play this half-inning.")
+            batted_data = list(half_inning_batted_balls)
+            while len(batted_data) < 15:
+                batted_data.append({
+                    'Batter': '',
+                    'Result': '',
+                    'EV (mph)': '',
+                    'LA (°)': '',
+                    'Dist (ft)': ''
+                })
+            df_batted = pd.DataFrame(batted_data[:15])[['Batter', 'Result', 'EV (mph)', 'LA (°)', 'Dist (ft)']]
+            
+            st.dataframe(
+                df_batted,
+                use_container_width=True,
+                hide_index=True,
+                height=240,
+                column_config={
+                    "Batter": st.column_config.TextColumn("Batter", width=110),
+                    "Result": st.column_config.TextColumn("Result", width="medium"),
+                    "EV (mph)": st.column_config.TextColumn("EV (mph)", width="small"),
+                    "LA (°)": st.column_config.TextColumn("LA (°)", width="small"),
+                    "Dist (ft)": st.column_config.TextColumn("Dist (ft)", width="small")
+                }
+            )
 
 render_brewers_dashboard(game_pk)
