@@ -147,12 +147,13 @@ st.markdown(f"""
 
     .table-wrapper {{
         width: 100%;
+        height: 540px;
         overflow-x: auto;
         overflow-y: hidden;
         background-color: {card_bg};
         border: 1px solid {card_border};
         border-radius: 8px;
-        margin-top: 8px;
+        margin-top: 4px;
     }}
 
     .custom-table {{
@@ -376,7 +377,7 @@ def draw_full_baseball_field(batted_balls, runners_info, field_title_label, is_d
     ax.set_title(field_title_label, fontsize=10, fontweight='bold', color=subtext_color, pad=12, fontfamily='Fira Code')
     return fig
 
-# Helper to render clean exactly 15-slot HTML tables with horizontal scrolling and zero vertical scrollbars
+# Helper to render clean exactly 15-slot HTML tables with fixed height and zero vertical scrollbars
 def render_custom_table(headers, rows, n_slots=15):
     padded_rows = list(rows)
     for i in range(len(padded_rows), n_slots):
@@ -503,7 +504,7 @@ def render_brewers_dashboard(game_pk):
                 })
                 p_num += 1
 
-        # 2. Batted Balls Log & Spray Chart (Ensuring up to 15 slots)
+        # 2. Batted Balls Log & Spray Chart
         target_half = 'top' if inning_state.lower() in ['top', 'top 1', 't'] else 'bottom'
         current_inning_plays = [
             p for p in plays 
@@ -610,13 +611,13 @@ def render_brewers_dashboard(game_pk):
         col_pitch, col_log = st.columns([1, 1])
 
         with col_pitch:
-            st.markdown("**Current At-Bat Pitch Log**")
+            st.markdown("<div style='height: 24px; display: flex; align-items: center;'><b>Current At-Bat Pitch Log</b></div>", unsafe_allow_html=True)
             pitch_headers = ['#', 'Pitch', 'Velo', 'Spin', 'Result']
             pitch_html = render_custom_table(pitch_headers, current_ab_pitches, n_slots=15)
             st.html(pitch_html)
 
         with col_log:
-            st.markdown(f"**Half-Inning Batted Balls ({inning_state} {inning_num})**")
+            st.markdown(f"<div style='height: 24px; display: flex; align-items: center;'><b>Batted Balls ({inning_state[:3]} {inning_num})</b></div>", unsafe_allow_html=True)
             batted_headers = ['Batter', 'Result', 'EV (mph)', 'LA (°)', 'Dist (ft)']
             batted_html = render_custom_table(batted_headers, half_inning_batted_balls, n_slots=15)
             st.html(batted_html)
