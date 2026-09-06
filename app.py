@@ -113,6 +113,16 @@ st.html("""
 
 BREWERS_TEAM_ID = 158
 
+# Official MLB Team ID to Standard 3-Letter Abbreviation Mapping
+TEAM_ABBREVS = {
+    108: "LAA", 109: "ARI", 110: "BAL", 111: "BOS", 112: "CHC",
+    113: "CIN", 114: "CLE", 115: "COL", 116: "DET", 117: "HOU",
+    118: "KC",  119: "LAD", 120: "WSH", 121: "NYM", 133: "OAK",
+    134: "PIT", 135: "SD",  136: "SEA", 137: "SF",  138: "STL",
+    139: "TB",  140: "TEX", 141: "TOR", 142: "MIN", 143: "PHI",
+    144: "ATL", 145: "CWS", 146: "MIA", 147: "NYY", 158: "MIL"
+}
+
 # Stadium dimensions lookup
 STADIUM_DIMENSIONS = {
     'Great American Ball Park': {'lf': 328, 'lcf': 379, 'cf': 404, 'rcf': 370, 'rf': 325},
@@ -311,8 +321,12 @@ def render_brewers_dashboard(game_pk):
         selected_games = [oot_games[(st.session_state.ticker_idx + i) % n_games] for i in range(min(3, n_games))]
         
         for g in selected_games:
-            away_abbrev = g.get('away_abbrev', g.get('away_name', 'AWY')[:3]).upper()
-            home_abbrev = g.get('home_abbrev', g.get('home_name', 'HME')[:3]).upper()
+            away_id = g.get('away_id')
+            home_id = g.get('home_id')
+            
+            away_abbrev = TEAM_ABBREVS.get(away_id, g.get('away_name', 'AWY')[:3]).upper()
+            home_abbrev = TEAM_ABBREVS.get(home_id, g.get('home_name', 'HME')[:3]).upper()
+            
             a_score = g.get('away_score', 0)
             h_score = g.get('home_score', 0)
             status = format_compact_status(g.get('status', 'PRE'))
@@ -327,7 +341,7 @@ def render_brewers_dashboard(game_pk):
     else:
         ticker_cards_html = '<div style="color: #94A3B8; font-size: 0.85rem; text-align: center;">No out-of-town games active</div>'
 
-    # 50/50 Header Section using st.html
+    # 50/50 Header Section
     col_scorebug, col_ticker = st.columns([1, 1])
 
     with col_scorebug:
