@@ -96,7 +96,7 @@ st.markdown(f"""
         background-color: {ticker_bg};
         border: 1px solid {card_border};
         border-radius: 8px;
-        padding: 24px 18px;
+        padding: 16px 18px;
         margin-top: 0px;
         margin-bottom: 10px;
         display: flex;
@@ -111,7 +111,7 @@ st.markdown(f"""
         font-weight: 700;
         color: #00B4D8;
         letter-spacing: 0.05em;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
     }}
 
     .ticker-games-grid {{
@@ -423,6 +423,9 @@ def render_brewers_dashboard(game_pk):
         st.info("Awaiting today's Milwaukee Brewers game schedule.")
         return
 
+    # Delay slider placed right above the out-of-town scoreboard
+    delay_sec = st.slider("Broadcast Delay Offset (seconds)", 0, 120, 0, step=5, key="broadcast_delay_slider")
+
     feed = fetch_live_game_feed(game_pk)
     if not feed or 'liveData' not in feed:
         st.info("Game feed loading or pre-game status...")
@@ -446,6 +449,25 @@ def render_brewers_dashboard(game_pk):
     linescore = live_data.get('linescore', {})
     plays = live_data.get('plays', {}).get('allPlays', [])
     players_dict = game_data.get('players', {})
+
+    # Apply pseudo-delay filtering on plays based on timestamp comparison if delay_sec > 0
+    if delay_sec > 0 and plays:
+        try:
+            now_utc = datetime.datetime.now(datetime.timezone.utc)
+            delayed_cutoff = now_utc - datetime.timedelta(seconds=delay_sec)
+            filtered_plays = []
+            for p in plays:
+                about = p.get('about', {})
+                end_time_str = about.get('endTime')
+                if end_time_str:
+                    p_time = datetime.datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+                    if p_time <= delayed_cutoff:
+                        filtered_plays.append(p)
+                else:
+                    filtered_plays.append(p)
+            plays = filtered_plays
+        except Exception:
+            pass
 
     teams = game_data.get('teams', {})
     away_name = teams.get('away', {}).get('clubName', 'AWAY')
